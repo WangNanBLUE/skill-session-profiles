@@ -1,0 +1,49 @@
+{
+  "name": "skill-session-profiles",
+  "version": "0.1.0",
+  "description": "Manage Codex skill defaults, reusable profiles, and persistent task configuration.",
+  "author": "Blue",
+  "license": "MIT",
+  "private": true,
+  "engines": {
+    "node": ">=22.22.2 <23"
+  },
+  "type": "module",
+  "main": "dist/electron/main.js",
+  "scripts": {
+    "clean": "node scripts/clean.mjs",
+    "build": "npm run clean && tsc --noEmit && vite build && vite build --config vite.desktop.config.ts && tsup",
+    "desktop": "npm run build && electron .",
+    "pack:mac": "npm run build && electron-builder --mac dir --arm64",
+    "dist:mac": "npm run build && electron-builder --mac dmg --arm64",
+    "test": "vitest run --passWithNoTests",
+    "test:ci": "npm run build && npm test && npm run test:e2e",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "test:electron": "npm run build && playwright test --config playwright.electron.config.ts"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@modelcontextprotocol/ext-apps": "1.7.5",
+    "@modelcontextprotocol/sdk": "1.30.0",
+    "lucide-react": "1.27.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "zod": "4.4.3",
+    "@playwright/test": "1.62.0",
+    "@testing-library/react": "16.3.2",
+    "@testing-library/user-event": "14.6.1",
+    "@types/node": "26.1.2",
+    "@types/react": "19.2.17",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "6.0.4",
+    "electron": "39.8.10",
+    "electron-builder": "26.15.3",
+    "jsdom": "30.0.0",
+    "tsup": "8.5.1",
+    "typescript": "7.0.2",
+    "vite": "8.1.5",
+    "vite-plugin-singlefile": "2.3.3",
+    "vitest": "4.1.10"
+  }
+}

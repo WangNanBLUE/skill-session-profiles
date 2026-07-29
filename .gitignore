@@ -1,0 +1,17 @@
+node_modules/
+dist/
+output/
+test-results/
+playwright-report/
+.plugin-data/
+.impeccable/
+docs/superpowers/
+
+.DS_Store
+*.log
+*.tmp
+*.swp
+
+.env
+.env.*
+!.env.example

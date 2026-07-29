@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "skill-session-profiles": {
+      "command": "node",
+      "args": [
+        "dist/server/index.js"
+      ],
+      "cwd": "."
+    }
+  }
+}

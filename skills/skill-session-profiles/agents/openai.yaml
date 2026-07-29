@@ -1,0 +1,4 @@
+interface:
+  display_name: "Skill Session Profiles"
+  short_description: "Open the panel to manage skill defaults and next-task profiles."
+  default_prompt: "Open the Skill Session Profiles panel for this task directory."

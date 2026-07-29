@@ -1,0 +1,25 @@
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+### Added
+
+- Public repository documentation and GitHub contribution workflows.
+
+## [0.1.0] - 2026-07-29
+
+### Added
+
+- macOS desktop app and Codex plugin panel.
+- Global skill default management.
+- Reusable skill profiles with per-skill overrides.
+- Persistent configuration for subsequently opened Codex tasks.
+- Name and source filtering with bulk enable and disable actions.
+- Chinese and English interface modes.
+- Light and dark themes.
+- Local profile import and export.

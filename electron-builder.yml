@@ -1,0 +1,23 @@
+appId: com.blue.skill-session-profiles
+productName: Skill Session Profiles
+artifactName: Skill-Session-Profiles-${version}-${arch}.${ext}
+directories:
+  output: output
+files:
+  - dist/electron/**/*
+  - dist/desktop/**/*
+  - package.json
+asar: true
+npmRebuild: false
+afterPack: scripts/after-pack.cjs
+mac:
+  target:
+    - target: dmg
+      arch:
+        - arm64
+  category: public.app-category.developer-tools
+  icon: assets/logo.png
+  identity: null
+dmg:
+  title: Skill Session Profiles
+  sign: false
