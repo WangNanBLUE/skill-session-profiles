@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title description">
+  <title id="title">Skill Session Profiles</title>
+  <desc id="description">Five connected skill modules above an enabled configuration switch.</desc>
+
+  <rect x="72" y="72" width="880" height="880" rx="208" fill="#ffffff"/>
+
+  <g fill="none" stroke="#b9d0e6" stroke-width="16" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M356 220 432 328"/>
+    <path d="M512 204V328"/>
+    <path d="M668 220 592 328"/>
+    <path d="M432 328H592"/>
+    <path d="M512 328V504"/>
+  </g>
+
+  <g stroke="#1f5f9d" stroke-width="20">
+    <rect x="308" y="168" width="96" height="96" rx="28" fill="#ffffff"/>
+    <rect x="464" y="152" width="96" height="96" rx="28" fill="#1f5f9d"/>
+    <rect x="620" y="168" width="96" height="96" rx="28" fill="#ffffff"/>
+    <rect x="384" y="284" width="96" height="96" rx="28" fill="#ffffff"/>
+    <rect x="544" y="284" width="96" height="96" rx="28" fill="#ffffff"/>
+  </g>
+  <circle cx="512" cy="200" r="16" fill="#ffffff"/>
+
+  <rect x="168" y="504" width="688" height="368" rx="184" fill="#1f5f9d"/>
+  <circle cx="672" cy="688" r="140" fill="#ffffff"/>
+  <rect x="264" y="608" width="160" height="24" rx="12" fill="#ffffff"/>
+  <rect x="264" y="664" width="120" height="24" rx="12" fill="#ffffff"/>
+  <rect x="264" y="720" width="80" height="24" rx="12" fill="#ffffff"/>
+</svg>

@@ -11,6 +11,10 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Public repository documentation and GitHub contribution workflows.
 
+### Changed
+
+- Replace the application icon with the white-surface Skill Graph and Switch design.
+
 ### Fixed
 
 - Keep the real Codex app-server integration test out of portable GitHub CI.
