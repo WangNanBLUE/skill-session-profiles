@@ -54,13 +54,15 @@ Useful commands:
 npm run build
 npm test
 npm run test:e2e
+npm run test:codex-integration
 npm run test:electron
 npm run dist:mac
 ```
 
-`test:electron` launches the real desktop app and requires a working local
-Codex installation. The GitHub CI workflow runs the portable build, unit, and
-browser E2E checks.
+`test:codex-integration` launches a real Codex app-server process.
+`test:electron` launches the real desktop app. Both commands require a working
+local Codex installation. The GitHub CI workflow runs only the portable build,
+unit, and browser E2E checks.
 
 ## Build Artifacts
 

@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { expect, it } from "vitest";
 
-import { AppServerClient } from "../src/server/app-server-client.js";
+import { AppServerClient } from "../../src/server/app-server-client.js";
 
 it("reads Codex state without an app-server control socket", async () => {
   const codexHome = await mkdtemp(join(tmpdir(), "skill-profiles-codex-home-"));

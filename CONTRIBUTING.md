@@ -18,9 +18,13 @@ npm test
 npm run test:e2e
 ```
 
+Run `npm run test:codex-integration` when changing the stdio app-server
+transport or its Codex protocol integration.
+
 Run `npm run test:electron` on macOS when changing Electron integration,
 preload APIs, app-server discovery, or desktop layout. This check requires a
-working local Codex installation.
+working local Codex installation. The Codex integration check has the same
+requirement.
 
 ## Pull Requests
 

@@ -51,12 +51,14 @@ npm run desktop
 npm run build
 npm test
 npm run test:e2e
+npm run test:codex-integration
 npm run test:electron
 npm run dist:mac
 ```
 
-`test:electron` 会启动真实桌面应用，需要本机 Codex 可正常运行。GitHub CI 只运行
-可移植的构建、单元测试和浏览器 E2E。
+`test:codex-integration` 会启动真实 Codex app-server 进程，
+`test:electron` 会启动真实桌面应用。两者都需要本机 Codex 可正常运行。
+GitHub CI 只运行可移植的构建、单元测试和浏览器 E2E。
 
 ## 构建
 

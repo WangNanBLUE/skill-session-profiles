@@ -11,6 +11,10 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Public repository documentation and GitHub contribution workflows.
 
+### Fixed
+
+- Keep the real Codex app-server integration test out of portable GitHub CI.
+
 ## [0.1.0] - 2026-07-29
 
 ### Added

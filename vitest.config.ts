@@ -11,7 +11,13 @@ export default defineConfig({
             "src/**/*.{test,spec}.{ts,tsx}",
             "tests/**/*.{test,spec}.{ts,tsx}",
           ],
-          exclude: ["src/ui/**", "tests/ui/**", "tests/e2e/**", "tests/electron/**"],
+          exclude: [
+            "src/ui/**",
+            "tests/ui/**",
+            "tests/e2e/**",
+            "tests/electron/**",
+            "tests/integration/**",
+          ],
         },
       },
       {
