@@ -6,6 +6,7 @@ playwright-report/
 .plugin-data/
 .impeccable/
 docs/superpowers/
+.superpowers/
 
 .DS_Store
 *.log
