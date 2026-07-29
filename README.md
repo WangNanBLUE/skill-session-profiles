@@ -10,6 +10,20 @@ A macOS app and Codex plugin for managing global skill defaults, reusable
 profiles, and the persistent configuration used by subsequently opened Codex
 tasks.
 
+## Screenshots
+
+### Task configuration
+
+[![Task configuration](docs/images/task-configuration.png)](docs/images/task-configuration.png)
+
+### Reusable profile editor
+
+[![Reusable profile editor](docs/images/profile-editor.png)](docs/images/profile-editor.png)
+
+### Dark theme
+
+[![Dark theme](docs/images/dark-theme.png)](docs/images/dark-theme.png)
+
 ## Features
 
 - Browse installed Codex skills and filter them by name or source.

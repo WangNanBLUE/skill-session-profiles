@@ -9,6 +9,20 @@
 用于管理 Codex 全局 Skill 默认值、可复用配置方案，以及后续任务持续配置的
 macOS 应用和 Codex 插件。
 
+## 应用截图
+
+### 任务配置
+
+[![任务配置](docs/images/task-configuration.png)](docs/images/task-configuration.png)
+
+### 可复用配置方案
+
+[![可复用配置方案](docs/images/profile-editor.png)](docs/images/profile-editor.png)
+
+### 黑夜模式
+
+[![黑夜模式](docs/images/dark-theme.png)](docs/images/dark-theme.png)
+
 ## 功能
 
 - 浏览已安装的 Codex Skill，并按名称或来源筛选。
