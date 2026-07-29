@@ -22,7 +22,7 @@ jobs:
       - run: npm run build
       - run: npm test
       - run: npm run dist:mac
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
           files: |
             output/Skill-Session-Profiles-*.dmg
