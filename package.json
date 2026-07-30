@@ -15,7 +15,7 @@
     "build": "npm run clean && tsc --noEmit && vite build && vite build --config vite.desktop.config.ts && tsup",
     "desktop": "npm run build && electron .",
     "pack:mac": "npm run build && electron-builder --mac dir --arm64",
-    "dist:mac": "npm run build && electron-builder --mac dmg --arm64",
+    "dist:mac": "npm run build && electron-builder --mac dmg --arm64 --publish never",
     "test": "vitest run --passWithNoTests",
     "test:ci": "npm run build && npm test && npm run test:e2e",
     "test:watch": "vitest",
