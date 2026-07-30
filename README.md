@@ -14,15 +14,15 @@ tasks.
 
 ### Task configuration
 
-[![Task configuration](docs/images/task-configuration.png)](docs/images/task-configuration.png)
+[![Task configuration](docs/images/task-configuration-en.png)](docs/images/task-configuration-en.png)
 
 ### Reusable profile editor
 
-[![Reusable profile editor](docs/images/profile-editor.png)](docs/images/profile-editor.png)
+[![Reusable profile editor](docs/images/profile-editor-en.png)](docs/images/profile-editor-en.png)
 
 ### Dark theme
 
-[![Dark theme](docs/images/dark-theme.png)](docs/images/dark-theme.png)
+[![Dark theme](docs/images/dark-theme-en.png)](docs/images/dark-theme-en.png)
 
 ## Features
 
