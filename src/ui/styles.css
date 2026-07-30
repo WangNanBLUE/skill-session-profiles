@@ -92,12 +92,55 @@ dd {
 
 .desktop-shell {
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
   width: 100%;
   height: 100%;
   min-height: 600px;
   overflow: hidden;
   background: var(--canvas);
+}
+
+.resource-tabs {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  min-height: 48px;
+  padding: 6px var(--space-lg);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.resource-tabs button {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  min-width: 92px;
+  height: 36px;
+  justify-content: center;
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--radius-md);
+  color: var(--ink-muted);
+  background: transparent;
+  cursor: pointer;
+}
+
+.resource-tabs button:hover {
+  color: var(--ink);
+  background: var(--surface-subtle);
+}
+
+.resource-tabs button.active {
+  color: var(--ink);
+  background: var(--surface-subtle);
+  font-weight: 650;
+}
+
+.resource-tabs small {
+  color: var(--ink-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
 }
 
 .command-bar {
@@ -772,6 +815,10 @@ dd {
   gap: var(--space-sm);
   min-height: 42px;
   padding-bottom: var(--space-sm);
+}
+
+.resource-filter-bar .skill-search {
+  width: min(520px, 100%);
 }
 
 .source-filter {

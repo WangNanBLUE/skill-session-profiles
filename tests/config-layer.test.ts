@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { extractProjectSkillLayer, extractUserSkillLayer } from "../src/server/config-layer.js";
+import {
+  extractProjectResourceLayer,
+  extractProjectSkillLayer,
+  extractUserResourceLayer,
+  extractUserSkillLayer,
+} from "../src/server/config-layer.js";
 import type { ConfigReadResponse } from "../src/shared/contracts.js";
 
 describe("extractUserSkillLayer", () => {
@@ -72,5 +77,57 @@ it("ignores disabled project layers", () => {
     version: null,
     value: [],
     filePath: "/repo/.codex/config.toml",
+  });
+});
+
+it("extracts only explicit plugin and MCP enabled fields from each layer", () => {
+  const response: ConfigReadResponse = {
+    config: {}, origins: {},
+    layers: [
+      {
+        name: { type: "user", profile: null },
+        version: "user-v2",
+        config: {
+          plugins: {
+            "browser@openai-bundled": { enabled: false, channel: "stable" },
+            "without-toggle": { channel: "preview" },
+          },
+          mcp_servers: {
+            docs: { enabled: true, url: "https://example.com/mcp" },
+          },
+        },
+      },
+      {
+        name: { type: "project", dotCodexFolder: "/repo/.codex" },
+        version: "project-v2",
+        config: {
+          plugins: {
+            "browser@openai-bundled": { enabled: true },
+          },
+          mcp_servers: {
+            docs: { enabled: false, command: "docs-server" },
+          },
+        },
+      },
+    ],
+  };
+
+  expect(extractUserResourceLayer(response, "plugins")).toEqual({
+    version: "user-v2",
+    value: [{ id: "browser@openai-bundled", enabled: false }],
+  });
+  expect(extractUserResourceLayer(response, "mcp_servers")).toEqual({
+    version: "user-v2",
+    value: [{ id: "docs", enabled: true }],
+  });
+  expect(extractProjectResourceLayer(response, "/repo", "plugins")).toEqual({
+    version: "project-v2",
+    filePath: "/repo/.codex/config.toml",
+    value: [{ id: "browser@openai-bundled", enabled: true }],
+  });
+  expect(extractProjectResourceLayer(response, "/repo", "mcp_servers")).toEqual({
+    version: "project-v2",
+    filePath: "/repo/.codex/config.toml",
+    value: [{ id: "docs", enabled: false }],
   });
 });

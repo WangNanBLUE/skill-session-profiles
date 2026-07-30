@@ -16,6 +16,60 @@ const profiles: SkillProfile[] = [
   { id: "review", name: "代码审查", overrides: [{ path: skills[1].path, state: "disabled" }], createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z" },
 ];
 let state = {
+  plugins: [
+    {
+      id: "browser@openai-bundled",
+      name: "browser",
+      displayName: "Browser",
+      description: "控制应用内浏览器",
+      marketplace: "openai-bundled",
+      installed: true,
+      enabled: true,
+    },
+    {
+      id: "github@openai-curated-remote",
+      name: "github",
+      displayName: "GitHub",
+      description: "管理仓库、议题和拉取请求",
+      marketplace: "openai-curated-remote",
+      installed: true,
+      enabled: false,
+    },
+  ],
+  mcpServers: [
+    {
+      id: "openaiDeveloperDocs",
+      name: "openaiDeveloperDocs",
+      transport: "http" as const,
+      detail: "https://developers.openai.com/mcp",
+      enabled: true,
+      scopes: ["global"] as const,
+    },
+    {
+      id: "local-tools",
+      name: "local-tools",
+      transport: "stdio" as const,
+      detail: "node",
+      enabled: true,
+      scopes: ["global", "project"] as const,
+    },
+  ],
+  globalPluginConfig: [
+    { id: "browser@openai-bundled", enabled: true },
+    { id: "github@openai-curated-remote", enabled: false },
+  ],
+  projectPluginConfig: {
+    value: [{ id: "github@openai-curated-remote", enabled: true }],
+    filePath: "/Users/demo/projects/demo-project/.codex/config.toml",
+  },
+  globalMcpConfig: [
+    { id: "openaiDeveloperDocs", enabled: true },
+    { id: "local-tools", enabled: true },
+  ],
+  projectMcpConfig: {
+    value: [{ id: "local-tools", enabled: false }],
+    filePath: "/Users/demo/projects/demo-project/.codex/config.toml",
+  },
   skills,
   globalDefaults: skills.map(({ path, enabled }) => ({ path, enabled })),
   projectConfig: { value: [], filePath: "/Users/demo/projects/demo-project/.codex/config.toml" },
@@ -30,6 +84,40 @@ let state = {
 const api = {
   async call(name: string, args: Record<string, unknown>) {
     if (name === "get_skill_profile_state") return state;
+    if (name === "save_global_resource_configuration") {
+      if (args.resource === "plugin") {
+        state = {
+          ...state,
+          globalPluginConfig: args.value as typeof state.globalPluginConfig,
+        };
+      } else {
+        state = {
+          ...state,
+          globalMcpConfig: args.value as typeof state.globalMcpConfig,
+        };
+      }
+      return { value: args.value };
+    }
+    if (name === "save_project_resource_configuration") {
+      if (args.resource === "plugin") {
+        state = {
+          ...state,
+          projectPluginConfig: {
+            ...state.projectPluginConfig,
+            value: args.value as typeof state.projectPluginConfig.value,
+          },
+        };
+      } else {
+        state = {
+          ...state,
+          projectMcpConfig: {
+            ...state.projectMcpConfig,
+            value: args.value as typeof state.projectMcpConfig.value,
+          },
+        };
+      }
+      return { value: args.value };
+    }
     if (name === "save_skill_profile") {
       const profile = {
         id: String(args.id ?? Date.now()),

@@ -26,12 +26,18 @@ import type { PanelApi } from "./api.js";
 import type {
   PendingFile,
   CodexProject,
+  McpServerMetadata,
+  PluginMetadata,
+  ResourceOverride,
+  ResourceToggleEntry,
   SkillMetadata,
   SkillOverride,
   SkillProfile,
 } from "../shared/contracts.js";
 
 type Tab = "next" | "project" | "defaults";
+type ResourceKind = "plugin" | "mcp" | "skill";
+type ResourceScope = "global" | "project";
 type Language = "zh" | "en";
 type Theme = "light" | "dark";
 type ProfileDraft = {
@@ -43,10 +49,23 @@ type State = {
   skills: SkillMetadata[];
   globalDefaults: Array<{ path: string; enabled: boolean }>;
   projectConfig: { value: Array<{ path: string; enabled: boolean }>; filePath: string };
+  plugins?: PluginMetadata[];
+  mcpServers?: McpServerMetadata[];
+  globalPluginConfig?: ResourceToggleEntry[];
+  projectPluginConfig?: { value: ResourceToggleEntry[]; filePath: string };
+  globalMcpConfig?: ResourceToggleEntry[];
+  projectMcpConfig?: { value: ResourceToggleEntry[]; filePath: string };
   projects: CodexProject[];
   profiles: SkillProfile[];
   pending: PendingFile | null;
   writable: boolean;
+};
+type ControlResource = {
+  id: string;
+  name: string;
+  description: string;
+  source: string;
+  enabled: boolean;
 };
 
 const COPY = {
@@ -69,6 +88,14 @@ const COPY = {
     user: "用户", repo: "仓库", system: "系统", admin: "管理", search: "搜索 Skill 名称",
     searchAria: "搜索 skill", clearSearch: "清空搜索", enableAll: "全部启用", disableAll: "全部禁用",
     skills: "个 Skill", switchLanguage: "Switch to English", switchTheme: "切换到黑夜模式", switchingProject: "正在切换项目…",
+    plugins: "插件", mcp: "MCP", skillTab: "技能", globalScope: "全局", projectScope: "项目",
+    pluginDetail: "控制已安装插件在所有后续 Codex 任务中的可用状态。",
+    pluginProjectDetail: "仅控制此项目中已安装插件的启停；不新增或删除插件，未设置项继承全局配置。",
+    mcpDetail: "控制已配置 MCP 服务在所有后续 Codex 任务中的可用状态。",
+    mcpProjectDetail: "仅控制此项目中已配置 MCP 服务的启停；不新增或删除服务，未设置项继承全局配置。",
+    saveResource: "保存配置", resource: "资源", location: "来源", resourceStatus: "状态",
+    noResource: "没有匹配的资源", noResourceDetail: "调整搜索条件后重试。",
+    searchResource: "搜索名称或来源", resourceSaved: "资源配置已保存。",
   },
   en: {
     taskConfig: "Task Configuration", project: "Project Configuration", codexProjects: "Codex Projects", projectRoots: "Project Root", profiles: "Profiles", defaults: "Global Defaults", functions: "Features",
@@ -89,6 +116,14 @@ const COPY = {
     user: "User", repo: "Repository", system: "System", admin: "Admin", search: "Search skill names",
     searchAria: "Search skills", clearSearch: "Clear search", enableAll: "Enable All", disableAll: "Disable All",
     skills: "skills", switchLanguage: "切换到中文", switchTheme: "Switch to dark mode", switchingProject: "Switching project…",
+    plugins: "Plugins", mcp: "MCP", skillTab: "Skills", globalScope: "Global", projectScope: "Project",
+    pluginDetail: "Control whether installed plugins are available to future Codex tasks.",
+    pluginProjectDetail: "Only toggle installed plugins for this project. No plugins are added or removed; unset items inherit global configuration.",
+    mcpDetail: "Control whether configured MCP servers are available to future Codex tasks.",
+    mcpProjectDetail: "Only toggle configured MCP servers for this project. No servers are added or removed; unset items inherit global configuration.",
+    saveResource: "Save Configuration", resource: "Resource", location: "Source", resourceStatus: "Status",
+    noResource: "No matching resources", noResourceDetail: "Change the search and try again.",
+    searchResource: "Search names or sources", resourceSaved: "Resource configuration saved.",
   },
 };
 type UiCopy = typeof COPY.zh;
@@ -98,6 +133,8 @@ const useCopy = (): UiCopy => COPY[useContext(LanguageContext)];
 export function App({ api, cwd }: { api: PanelApi; cwd: string }) {
   const [activeCwd, setActiveCwd] = useState(cwd);
   const [tab, setTab] = useState<Tab>("next");
+  const [resourceKind, setResourceKind] = useState<ResourceKind>("skill");
+  const [resourceScope, setResourceScope] = useState<ResourceScope>("global");
   const [state, setState] = useState<State | null>(null);
   const [loadingCwd, setLoadingCwd] = useState<string | null>(null);
   const [query, setQuery] = useState("");
@@ -110,6 +147,10 @@ export function App({ api, cwd }: { api: PanelApi; cwd: string }) {
   const [projectOverrides, setProjectOverrides] = useState<SkillOverride[]>([]);
   const [profileDraft, setProfileDraft] = useState<ProfileDraft | null>(null);
   const [defaultValues, setDefaultValues] = useState<Record<string, boolean>>({});
+  const [pluginGlobalValues, setPluginGlobalValues] = useState<Record<string, boolean>>({});
+  const [pluginProjectOverrides, setPluginProjectOverrides] = useState<ResourceOverride[]>([]);
+  const [mcpGlobalValues, setMcpGlobalValues] = useState<Record<string, boolean>>({});
+  const [mcpProjectOverrides, setMcpProjectOverrides] = useState<ResourceOverride[]>([]);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [language, setLanguage] = useState<Language>(() => readPreference("language", "zh"));
   const [theme, setTheme] = useState<Theme>(() =>
@@ -155,6 +196,20 @@ export function App({ api, cwd }: { api: PanelApi; cwd: string }) {
       path: entry.path,
       state: entry.enabled ? "enabled" : "disabled",
     })));
+    setPluginGlobalValues(Object.fromEntries(
+      (state.globalPluginConfig ?? []).map((entry) => [entry.id, entry.enabled]),
+    ));
+    setPluginProjectOverrides((state.projectPluginConfig?.value ?? []).map((entry) => ({
+      id: entry.id,
+      state: entry.enabled ? "enabled" : "disabled",
+    })));
+    setMcpGlobalValues(Object.fromEntries(
+      (state.globalMcpConfig ?? []).map((entry) => [entry.id, entry.enabled]),
+    ));
+    setMcpProjectOverrides((state.projectMcpConfig?.value ?? []).map((entry) => ({
+      id: entry.id,
+      state: entry.enabled ? "enabled" : "disabled",
+    })));
   }, [state]);
 
   useEffect(() => {
@@ -184,6 +239,37 @@ export function App({ api, cwd }: { api: PanelApi; cwd: string }) {
       skill.name.toLocaleLowerCase().includes(normalizedQuery)
       && (scopeFilter === "all" || skill.scope === scopeFilter));
   }, [query, scopeFilter, state]);
+  const controlResources = useMemo<ControlResource[]>(() => {
+    if (resourceKind === "plugin") {
+      return (state?.plugins ?? []).map((plugin) => ({
+        id: plugin.id,
+        name: plugin.displayName,
+        description: plugin.description || plugin.id,
+        source: plugin.marketplace,
+        enabled: plugin.enabled,
+      }));
+    }
+    if (resourceKind === "mcp") {
+      return (state?.mcpServers ?? [])
+        .filter((server) =>
+          resourceScope === "project" || server.scopes?.includes("global") !== false)
+        .map((server) => ({
+          id: server.id,
+          name: server.name,
+          description: server.detail || (language === "zh" ? "已配置的 MCP 服务" : "Configured MCP server"),
+          source: server.transport.toUpperCase(),
+          enabled: server.enabled,
+        }));
+    }
+    return [];
+  }, [language, resourceKind, resourceScope, state]);
+  const displayedResources = useMemo(() => {
+    const normalizedQuery = query.trim().toLocaleLowerCase();
+    return controlResources.filter((resource) =>
+      `${resource.name}\n${resource.description}\n${resource.source}`
+        .toLocaleLowerCase()
+        .includes(normalizedQuery));
+  }, [controlResources, query]);
   const inventoryPaths = useMemo(
     () => new Set((state?.skills ?? []).map((skill) => skill.path)),
     [state],
@@ -210,6 +296,25 @@ export function App({ api, cwd }: { api: PanelApi; cwd: string }) {
       path: entry.path,
       state: entry.enabled ? "enabled" : "disabled",
     })));
+  const pluginGlobalDirty = state !== null
+    && toggleValuesKey(pluginGlobalValues, state.plugins ?? [])
+      !== toggleEntriesKey(state.globalPluginConfig ?? []);
+  const mcpGlobalDirty = state !== null
+    && toggleValuesKey(
+      mcpGlobalValues,
+      (state.mcpServers ?? []).filter((server) =>
+        server.scopes?.includes("global") !== false),
+    )
+      !== toggleEntriesKey(state.globalMcpConfig ?? []);
+  const pluginProjectDirty = state !== null
+    && resourceOverridesKey(pluginProjectOverrides)
+      !== resourceEntriesKey(state.projectPluginConfig?.value ?? []);
+  const mcpProjectDirty = state !== null
+    && resourceOverridesKey(mcpProjectOverrides)
+      !== resourceEntriesKey(state.projectMcpConfig?.value ?? []);
+  const resourceDirty = resourceKind === "plugin"
+    ? resourceScope === "global" ? pluginGlobalDirty : pluginProjectDirty
+    : resourceScope === "global" ? mcpGlobalDirty : mcpProjectDirty;
   const nextStaleCount = nextOverrides.length - currentNextOverrides.length;
   const currentDraftOverrides = currentOverrides(profileDraft?.overrides ?? [], inventoryPaths);
   const draftStaleCount = (profileDraft?.overrides.length ?? 0) - currentDraftOverrides.length;
@@ -327,6 +432,24 @@ export function App({ api, cwd }: { api: PanelApi; cwd: string }) {
       </div>
     </header>
 
+    <nav className="resource-tabs" aria-label={language === "zh" ? "资源类型" : "Resource type"}>
+      {([
+        ["plugin", copy.plugins, state?.plugins?.length ?? 0],
+        ["mcp", copy.mcp, state?.mcpServers?.length ?? 0],
+        ["skill", copy.skillTab, state?.skills.length ?? 0],
+      ] as const).map(([kind, label, count]) => <button
+        type="button"
+        key={kind}
+        className={resourceKind === kind ? "active" : ""}
+        aria-current={resourceKind === kind ? "page" : undefined}
+        onClick={() => {
+          setResourceKind(kind);
+          setQuery("");
+          setScopeFilter("all");
+        }}
+      ><span>{label}</span><small>{count}</small></button>)}
+    </nav>
+
     <div className="state-stack">
       {error && <div className="state-banner error-banner" role="alert">
         <AlertTriangle size={17} />
@@ -354,6 +477,7 @@ export function App({ api, cwd }: { api: PanelApi; cwd: string }) {
 
     <div className="workbench">
       <aside className="sidebar">
+        {resourceKind === "skill" ? <>
         <nav className="side-nav" aria-label={copy.functions}>
           <button aria-label={copy.taskConfig} aria-current={tab === "next" ? "page" : undefined} className={tab === "next" ? "active" : ""} onClick={() => setTab("next")}>
             <CircleCheck size={17} /><span>{copy.taskConfig}</span>
@@ -415,6 +539,42 @@ export function App({ api, cwd }: { api: PanelApi; cwd: string }) {
             setActiveCwd(project.rootPaths[0]);
           }}
         />}
+        </> : <>
+          <nav className="side-nav resource-scope-nav" aria-label={language === "zh" ? "配置范围" : "Configuration scope"}>
+            <button
+              type="button"
+              aria-current={resourceScope === "global" ? "page" : undefined}
+              className={resourceScope === "global" ? "active" : ""}
+              onClick={() => setResourceScope("global")}
+            >
+              <Globe2 size={17} /><span>{copy.globalScope}</span>
+              <span className="nav-count">{controlResources.length}</span>
+            </button>
+            <button
+              type="button"
+              aria-current={resourceScope === "project" ? "page" : undefined}
+              className={resourceScope === "project" ? "active" : ""}
+              onClick={() => setResourceScope("project")}
+            >
+              <FolderOpen size={17} /><span>{copy.projectScope}</span>
+              <span className="nav-count">{
+                resourceKind === "plugin"
+                  ? pluginProjectOverrides.length
+                  : mcpProjectOverrides.length
+              }</span>
+            </button>
+          </nav>
+          {resourceScope === "project" && <ProjectRail
+            projects={state?.projects ?? []}
+            activeCwd={activeCwd}
+            onSelect={(project) => {
+              if (resourceDirty && !window.confirm(language === "zh"
+                ? "当前项目配置尚未保存，确定切换项目吗？"
+                : "The current project configuration is unsaved. Switch projects?")) return;
+              setActiveCwd(project.rootPaths[0]);
+            }}
+          />}
+        </>}
 
         <div className="scope-path" title={activeCwd}>
           <FolderOpen size={14} />
@@ -428,6 +588,7 @@ export function App({ api, cwd }: { api: PanelApi; cwd: string }) {
         inert={switchingProject ? true : undefined}
       >
         {switchingProject && <div className="project-switch-progress" role="progressbar" aria-label={copy.switchingProject} />}
+        {resourceKind === "skill" ? <>
         {tab === "next" && !profileDraft && <>
           <PaneHeader
             title={selectedNextProfile?.name ?? copy.inheritGlobal}
@@ -585,10 +746,55 @@ export function App({ api, cwd }: { api: PanelApi; cwd: string }) {
             }))}
           />
         </>}
+        </> : <ResourceControlPane
+          kind={resourceKind}
+          scope={resourceScope}
+          resources={displayedResources}
+          total={controlResources.length}
+          query={query}
+          setQuery={setQuery}
+          searchRef={searchRef}
+          globalValues={resourceKind === "plugin" ? pluginGlobalValues : mcpGlobalValues}
+          projectOverrides={resourceKind === "plugin" ? pluginProjectOverrides : mcpProjectOverrides}
+          setGlobalValue={(id, enabled) => {
+            if (resourceKind === "plugin") {
+              setPluginGlobalValues((current) => ({ ...current, [id]: enabled }));
+            } else {
+              setMcpGlobalValues((current) => ({ ...current, [id]: enabled }));
+            }
+          }}
+          setProjectOverride={(id, value) => {
+            if (resourceKind === "plugin") {
+              setPluginProjectOverrides((current) => updateResourceOverride(current, id, value));
+            } else {
+              setMcpProjectOverrides((current) => updateResourceOverride(current, id, value));
+            }
+          }}
+          setAll={(enabled) => {
+            if (resourceScope === "global") {
+              const updates = Object.fromEntries(displayedResources.map((item) => [item.id, enabled]));
+              if (resourceKind === "plugin") {
+                setPluginGlobalValues((current) => ({ ...current, ...updates }));
+              } else {
+                setMcpGlobalValues((current) => ({ ...current, ...updates }));
+              }
+              return;
+            }
+            const stateValue = enabled ? "enabled" as const : "disabled" as const;
+            if (resourceKind === "plugin") {
+              setPluginProjectOverrides((current) =>
+                applyVisibleResourceOverrides(current, displayedResources, stateValue));
+            } else {
+              setMcpProjectOverrides((current) =>
+                applyVisibleResourceOverrides(current, displayedResources, stateValue));
+            }
+          }}
+        />}
       </section>
     </div>
 
     <footer className="status-bar" aria-live="polite">
+      {resourceKind === "skill" ? <>
       <div>
         {switchingProject && <>
           <span>{copy.switchingProject}</span>
@@ -656,6 +862,53 @@ export function App({ api, cwd }: { api: PanelApi; cwd: string }) {
           })}
         ><Check size={16} />{copy.saveDefaults}</button>}
       </div>
+      </> : <>
+        <div>
+          {switchingProject && <>
+            <span>{copy.switchingProject}</span>
+            <span className="status-separator">·</span>
+          </>}
+          <span>{displayedResources.length} {copy.filtered}</span>
+          <span className="status-separator">·</span>
+          <span>{resourceDirty ? copy.unsaved : copy.saved}</span>
+        </div>
+        <div className="status-actions">
+          {busy && <span className="saving-label">{copy.processing}</span>}
+          <button
+            type="button"
+            className="primary-button"
+            disabled={busy || !resourceDirty || state?.writable === false}
+            onClick={() => {
+              const resource = resourceKind === "plugin" ? "plugin" : "mcp";
+              const globalValues = resourceKind === "plugin"
+                ? pluginGlobalValues
+                : mcpGlobalValues;
+              const projectValues = resourceKind === "plugin"
+                ? pluginProjectOverrides
+                : mcpProjectOverrides;
+              void run(
+                resourceScope === "global"
+                  ? "save_global_resource_configuration"
+                  : "save_project_resource_configuration",
+                {
+                  cwd: activeCwd,
+                  resource,
+                  value: resourceScope === "global"
+                    ? controlResources.map((item) => ({
+                        id: item.id,
+                        enabled: globalValues[item.id] ?? item.enabled,
+                      }))
+                    : projectValues.map((item) => ({
+                        id: item.id,
+                        enabled: item.state === "enabled",
+                      })),
+                },
+                () => setSuccess(copy.resourceSaved),
+              );
+            }}
+          ><Check size={16} />{copy.saveResource}</button>
+        </div>
+      </>}
     </footer>
   </main></LanguageContext.Provider>;
 }
@@ -793,6 +1046,160 @@ function PaneHeader({ title, description, count, countLabel = "项覆盖", actio
       <p>{description}</p>
     </div>
     {actions && <div className="pane-actions">{actions}</div>}
+  </div>;
+}
+
+function ResourceControlPane({
+  kind,
+  scope,
+  resources,
+  total,
+  query,
+  setQuery,
+  searchRef,
+  globalValues,
+  projectOverrides,
+  setGlobalValue,
+  setProjectOverride,
+  setAll,
+}: {
+  kind: "plugin" | "mcp";
+  scope: ResourceScope;
+  resources: ControlResource[];
+  total: number;
+  query: string;
+  setQuery(value: string): void;
+  searchRef: React.RefObject<HTMLInputElement | null>;
+  globalValues: Record<string, boolean>;
+  projectOverrides: ResourceOverride[];
+  setGlobalValue(id: string, enabled: boolean): void;
+  setProjectOverride(id: string, value: "inherit" | "enabled" | "disabled"): void;
+  setAll(enabled: boolean): void;
+}) {
+  const copy = useCopy();
+  const language = useContext(LanguageContext);
+  const overrideMap = useMemo(
+    () => new Map(projectOverrides.map((item) => [item.id, item.state])),
+    [projectOverrides],
+  );
+  const title = `${scope === "global" ? copy.globalScope : copy.projectScope} · ${
+    kind === "plugin" ? copy.plugins : copy.mcp
+  }`;
+  const description = kind === "plugin"
+    ? scope === "global" ? copy.pluginDetail : copy.pluginProjectDetail
+    : scope === "global" ? copy.mcpDetail : copy.mcpProjectDetail;
+  const count = scope === "global"
+    ? resources.filter((item) => globalValues[item.id] ?? item.enabled).length
+    : projectOverrides.length;
+
+  return <>
+    <PaneHeader
+      title={title}
+      description={description}
+      count={count}
+      countLabel={scope === "global"
+        ? language === "zh" ? "项启用" : "enabled"
+        : language === "zh" ? "项项目覆盖" : "project overrides"}
+    />
+    <div className="skill-workbench">
+      <ResourceFilterBar
+        query={query}
+        setQuery={setQuery}
+        searchRef={searchRef}
+        visibleCount={resources.length}
+        total={total}
+        onEnable={() => setAll(true)}
+        onDisable={() => setAll(false)}
+      />
+      <div className="skill-table resource-table">
+        <div className="table-head">
+          <span>{copy.resource}</span><span>{copy.location}</span><span>{copy.resourceStatus}</span>
+        </div>
+        <div className="table-scroll">
+          {resources.map((resource) => <div className="skill-row" key={resource.id}>
+            <div className="skill-info">
+              <strong>{resource.name}</strong>
+              <span title={resource.description}>{resource.description}</span>
+            </div>
+            <span className="scope-label" title={resource.source}>{resource.source}</span>
+            {scope === "global"
+              ? <label className="toggle-control">
+                  <input
+                    type="checkbox"
+                    aria-label={`${resource.name} ${copy.resourceStatus}`}
+                    checked={globalValues[resource.id] ?? resource.enabled}
+                    onChange={(event) => setGlobalValue(resource.id, event.target.checked)}
+                  />
+                  <span aria-hidden="true" />
+                  <strong>{globalValues[resource.id] ?? resource.enabled ? copy.enabled : copy.disabled}</strong>
+                </label>
+              : <fieldset className="segmented-control" aria-label={`${resource.name} ${copy.setting}`}>
+                  {(["inherit", "enabled", "disabled"] as const).map((choice) => <label key={choice}>
+                    <input
+                      type="radio"
+                      checked={(overrideMap.get(resource.id) ?? "inherit") === choice}
+                      onChange={() => setProjectOverride(resource.id, choice)}
+                    />
+                    <span>{choice === "inherit"
+                      ? copy.inherit
+                      : choice === "enabled" ? copy.enabled : copy.disabled}</span>
+                  </label>)}
+                </fieldset>}
+          </div>)}
+          {resources.length === 0 && <div className="table-empty">
+            <Search size={20} />
+            <strong>{copy.noResource}</strong>
+            <span>{copy.noResourceDetail}</span>
+          </div>}
+        </div>
+      </div>
+    </div>
+  </>;
+}
+
+function ResourceFilterBar({
+  query,
+  setQuery,
+  searchRef,
+  visibleCount,
+  total,
+  onEnable,
+  onDisable,
+}: {
+  query: string;
+  setQuery(value: string): void;
+  searchRef: React.RefObject<HTMLInputElement | null>;
+  visibleCount: number;
+  total: number;
+  onEnable(): void;
+  onDisable(): void;
+}) {
+  const copy = useCopy();
+  const english = useContext(LanguageContext) === "en";
+  return <div className="filter-bar resource-filter-bar">
+    <label className="skill-search">
+      <span className="sr-only">{copy.searchResource}</span>
+      <Search size={15} aria-hidden="true" />
+      <input
+        ref={searchRef}
+        aria-label={copy.searchResource}
+        value={query}
+        onChange={(event) => setQuery(event.target.value)}
+        placeholder={copy.searchResource}
+      />
+      {query
+        ? <button type="button" className="bare-icon" aria-label={copy.clearSearch} onClick={() => setQuery("")}><X size={15} /></button>
+        : <kbd>⌘K</kbd>}
+    </label>
+    <span className="filter-summary">{visibleCount === total ? total : `${visibleCount} / ${total}`}</span>
+    <div className="bulk-actions">
+      <button type="button" className="secondary-button" disabled={visibleCount === 0} onClick={onEnable}>
+        <CircleCheck size={15} />{copy.enableAll}{english ? ` (${visibleCount})` : `（${visibleCount}）`}
+      </button>
+      <button type="button" className="secondary-button" disabled={visibleCount === 0} onClick={onDisable}>
+        <CircleX size={15} />{copy.disableAll}{english ? ` (${visibleCount})` : `（${visibleCount}）`}
+      </button>
+    </div>
   </div>;
 }
 
@@ -967,6 +1374,53 @@ function LoadingShell({ language }: { language: Language }) {
     <header className="command-bar"><div className="skeleton brand-skeleton" /><div className="skeleton search-skeleton" /></header>
     <div className="workbench"><aside className="sidebar"><div className="skeleton nav-skeleton" /></aside><section className="content-pane"><div className="skeleton title-skeleton" /><div className="skeleton table-skeleton" /></section></div>
   </main>;
+}
+
+function updateResourceOverride(
+  current: ResourceOverride[],
+  id: string,
+  value: "inherit" | "enabled" | "disabled",
+): ResourceOverride[] {
+  return value === "inherit"
+    ? current.filter((item) => item.id !== id)
+    : [...current.filter((item) => item.id !== id), { id, state: value }];
+}
+
+function applyVisibleResourceOverrides(
+  current: ResourceOverride[],
+  resources: ControlResource[],
+  value: "enabled" | "disabled",
+): ResourceOverride[] {
+  const visibleIds = new Set(resources.map((resource) => resource.id));
+  return [
+    ...current.filter((item) => !visibleIds.has(item.id)),
+    ...resources.map((resource) => ({ id: resource.id, state: value })),
+  ];
+}
+
+function resourceOverridesKey(overrides: ResourceOverride[]): string {
+  return JSON.stringify([...overrides].sort((a, b) => a.id.localeCompare(b.id)));
+}
+
+function resourceEntriesKey(entries: ResourceToggleEntry[]): string {
+  return resourceOverridesKey(entries.map((entry) => ({
+    id: entry.id,
+    state: entry.enabled ? "enabled" : "disabled",
+  })));
+}
+
+function toggleValuesKey(
+  values: Record<string, boolean>,
+  resources: Array<{ id: string; enabled: boolean }>,
+): string {
+  return toggleEntriesKey(resources.map((resource) => ({
+    id: resource.id,
+    enabled: values[resource.id] ?? resource.enabled,
+  })));
+}
+
+function toggleEntriesKey(entries: ResourceToggleEntry[]): string {
+  return JSON.stringify([...entries].sort((a, b) => a.id.localeCompare(b.id)));
 }
 
 function updateOverride(

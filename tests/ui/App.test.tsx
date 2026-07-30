@@ -1,10 +1,53 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "../../src/ui/App.js";
 
 const state = {
+  plugins: [
+    {
+      id: "browser@openai-bundled",
+      name: "browser",
+      displayName: "Browser",
+      description: "Control the in-app browser",
+      marketplace: "openai-bundled",
+      installed: true,
+      enabled: true,
+    },
+  ],
+  mcpServers: [
+    {
+      id: "docs",
+      name: "docs",
+      transport: "http",
+      detail: "https://example.com/mcp",
+      enabled: true,
+      scopes: ["global"],
+    },
+    {
+      id: "project-tools",
+      name: "project-tools",
+      transport: "stdio",
+      detail: "node",
+      enabled: true,
+      scopes: ["project"],
+    },
+  ],
+  globalPluginConfig: [
+    { id: "browser@openai-bundled", enabled: true },
+  ],
+  projectPluginConfig: {
+    value: [],
+    filePath: "/repo/.codex/config.toml",
+  },
+  globalMcpConfig: [
+    { id: "docs", enabled: true },
+  ],
+  projectMcpConfig: {
+    value: [{ id: "project-tools", enabled: false }],
+    filePath: "/repo/.codex/config.toml",
+  },
   skills: [
     { name: "Review", description: "Code checks", path: "/skills/review/SKILL.md", scope: "user", enabled: true },
     { name: "Deploy", description: "Review releases", path: "/skills/deploy/SKILL.md", scope: "repo", enabled: true },
@@ -87,6 +130,87 @@ describe("Skill Session Profiles panel", () => {
     await userEvent.click(screen.getByRole("button", { name: "Switch to dark mode" }));
     expect(document.documentElement.dataset.theme).toBe("dark");
     expect(localStorage.getItem("skill-session-profiles:theme")).toBe("dark");
+  });
+
+  it("shows plugin, MCP, and skill tabs with inventory counts", async () => {
+    render(<App api={createApi()} cwd="/repo" />);
+    await screen.findByText("Skill Session Profiles");
+
+    const resourceTabs = screen.getByRole("navigation", { name: "资源类型" });
+    expect(within(resourceTabs).getByRole("button", { name: "插件1" })).toBeTruthy();
+    expect(within(resourceTabs).getByRole("button", { name: "MCP2" })).toBeTruthy();
+    expect(within(resourceTabs).getByRole("button", { name: "技能3" })).toBeTruthy();
+  });
+
+  it("saves global plugin toggles", async () => {
+    const api = createApi();
+    render(<App api={api} cwd="/repo" />);
+    await screen.findByText("Skill Session Profiles");
+    await userEvent.click(screen.getByRole("button", { name: "插件1" }));
+    await userEvent.click(screen.getByRole("checkbox", { name: "Browser 状态" }));
+    await userEvent.click(screen.getByRole("button", { name: "保存配置" }));
+
+    expect(api.call).toHaveBeenCalledWith("save_global_resource_configuration", {
+      cwd: "/repo",
+      resource: "plugin",
+      value: [{ id: "browser@openai-bundled", enabled: false }],
+    });
+  });
+
+  it("saves project plugin overrides and supports inheritance", async () => {
+    const projectState = {
+      ...state,
+      projectPluginConfig: {
+        ...state.projectPluginConfig,
+        value: [{ id: "browser@openai-bundled", enabled: true }],
+      },
+    };
+    const api = createApi();
+    api.call.mockImplementation(async (name: string) => {
+      if (name === "get_skill_profile_state") return projectState;
+      return {};
+    });
+    render(<App api={api} cwd="/repo" />);
+    await screen.findByText("Skill Session Profiles");
+    await userEvent.click(screen.getByRole("button", { name: "插件1" }));
+    await userEvent.click(screen.getByRole("button", { name: "项目1" }));
+    const setting = screen.getByRole("group", { name: "Browser 设置" });
+    await userEvent.click(within(setting).getByRole("radio", { name: "继承" }));
+    await userEvent.click(screen.getByRole("button", { name: "保存配置" }));
+
+    expect(api.call).toHaveBeenCalledWith("save_project_resource_configuration", {
+      cwd: "/repo",
+      resource: "plugin",
+      value: [],
+    });
+  });
+
+  it("saves global and project MCP settings", async () => {
+    const api = createApi();
+    render(<App api={api} cwd="/repo" />);
+    await screen.findByText("Skill Session Profiles");
+    await userEvent.click(screen.getByRole("button", { name: "MCP2" }));
+    expect(screen.queryByText("project-tools", { exact: true })).toBeNull();
+    await userEvent.click(screen.getByRole("checkbox", { name: "docs 状态" }));
+    await userEvent.click(screen.getByRole("button", { name: "保存配置" }));
+    expect(api.call).toHaveBeenCalledWith("save_global_resource_configuration", {
+      cwd: "/repo",
+      resource: "mcp",
+      value: [{ id: "docs", enabled: false }],
+    });
+
+    await userEvent.click(screen.getByRole("button", { name: "项目1" }));
+    const setting = screen.getByRole("group", { name: "docs 设置" });
+    await userEvent.click(within(setting).getByRole("radio", { name: "停用" }));
+    await userEvent.click(screen.getByRole("button", { name: "保存配置" }));
+    expect(api.call).toHaveBeenCalledWith("save_project_resource_configuration", {
+      cwd: "/repo",
+      resource: "mcp",
+      value: [
+        { id: "project-tools", enabled: false },
+        { id: "docs", enabled: false },
+      ],
+    });
   });
 
   it("offers complete profile management actions", async () => {

@@ -11,7 +11,12 @@ import { AppServerClient } from "./app-server-client.js";
 import { SkillProfileBackend } from "./backend.js";
 import { prepareSharedDataRoot } from "./data-root.js";
 import { JsonStore } from "./json-store.js";
-import { profilesFileSchema, skillConfigEntrySchema, skillOverrideSchema } from "../shared/contracts.js";
+import {
+  profilesFileSchema,
+  resourceToggleEntrySchema,
+  skillConfigEntrySchema,
+  skillOverrideSchema,
+} from "../shared/contracts.js";
 
 const UI_URI = "ui://skill-session-profiles/panel.html";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
@@ -88,6 +93,45 @@ server.registerTool("save_project_skill_configuration", {
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
 }, async ({ cwd, overrides }) =>
   result({ value: await backend.service.saveProjectConfiguration(cwd, overrides) }));
+
+server.registerTool("save_global_resource_configuration", {
+  description: "Save global plugin or MCP enablement.",
+  inputSchema: {
+    cwd: z.string(),
+    resource: z.enum(["plugin", "mcp"]),
+    value: z.array(resourceToggleEntrySchema),
+  },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
+}, async ({ cwd, resource, value }) => {
+  const current = await backend.state(cwd);
+  const allowedIds = new Set(
+    (resource === "plugin"
+      ? current.plugins
+      : current.mcpServers.filter((server) => server.scopes.includes("global")))
+      .map((item) => item.id),
+  );
+  return result({
+    value: await backend.resourceService.saveGlobal(cwd, resource, value, allowedIds),
+  });
+});
+
+server.registerTool("save_project_resource_configuration", {
+  description: "Save project plugin or MCP enablement.",
+  inputSchema: {
+    cwd: z.string(),
+    resource: z.enum(["plugin", "mcp"]),
+    value: z.array(resourceToggleEntrySchema),
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
+}, async ({ cwd, resource, value }) => {
+  const current = await backend.state(cwd);
+  const allowedIds = new Set(
+    (resource === "plugin" ? current.plugins : current.mcpServers).map((item) => item.id),
+  );
+  return result({
+    value: await backend.resourceService.saveProject(cwd, resource, value, allowedIds),
+  });
+});
 
 server.registerTool("arm_next_session_profile", {
   description: "Apply a skill overlay to the next qualifying Codex task.",

@@ -266,6 +266,32 @@ describe("AppServerClient", () => {
     await client.close();
   });
 
+  it("lists installed plugins through the experimental plugin API", async () => {
+    const { client, transport } = await createInitializedClient();
+    const pending = client.listPlugins();
+
+    await vi.waitFor(() => {
+      expect(transport.messages()).toHaveLength(3);
+    });
+    expect(transport.messages()[2]).toMatchObject({
+      method: "plugin/list",
+      params: {
+        cursor: null,
+        limit: 200,
+      },
+    });
+    transport.emitLine({
+      id: transport.messages()[2].id,
+      result: { marketplaces: [], nextCursor: null },
+    });
+
+    await expect(pending).resolves.toEqual({
+      marketplaces: [],
+      nextCursor: null,
+    });
+    await client.close();
+  });
+
   it("reads config layers and only sends cwd when provided", async () => {
     const { client, transport } = await createInitializedClient();
     const withoutCwd = client.readConfig();
@@ -340,6 +366,66 @@ describe("AppServerClient", () => {
       status: "ok",
       version: "version-2",
     });
+    await client.close();
+  });
+
+  it("writes resource enabled fields with the current config version", async () => {
+    const { client, transport } = await createInitializedClient();
+    const pending = client.batchWriteResourceConfig("plugins", [
+      { id: "browser@openai-bundled", enabled: false },
+      { id: "github", enabled: true },
+    ], "version-7");
+
+    await vi.waitFor(() => {
+      expect(transport.messages()).toHaveLength(3);
+    });
+    expect(transport.messages()[2]).toMatchObject({
+      method: "config/batchWrite",
+      params: {
+        edits: [
+          {
+            keyPath: 'plugins."browser@openai-bundled".enabled',
+            value: false,
+            mergeStrategy: "upsert",
+          },
+          {
+            keyPath: 'plugins."github".enabled',
+            value: true,
+            mergeStrategy: "upsert",
+          },
+        ],
+        expectedVersion: "version-7",
+        reloadUserConfig: true,
+      },
+    });
+    transport.emitLine({
+      id: transport.messages()[2].id,
+      result: {
+        status: "ok",
+        version: "version-8",
+        filePath: "/user/config.toml",
+        overriddenMetadata: null,
+      },
+    });
+
+    await expect(pending).resolves.toMatchObject({ version: "version-8" });
+    await client.close();
+  });
+
+  it("reloads MCP servers after configuration changes", async () => {
+    const { client, transport } = await createInitializedClient();
+    const pending = client.reloadMcpServers();
+
+    await vi.waitFor(() => {
+      expect(transport.messages()).toHaveLength(3);
+    });
+    expect(transport.messages()[2]).toMatchObject({
+      method: "config/mcpServer/reload",
+      params: {},
+    });
+    transport.emitLine({ id: transport.messages()[2].id, result: {} });
+
+    await expect(pending).resolves.toEqual({});
     await client.close();
   });
 

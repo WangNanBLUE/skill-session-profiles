@@ -69,3 +69,38 @@ test("project configuration selects from Codex projects", async ({ page }) => {
   await page.getByRole("button", { name: /Mineradio/ }).click();
   await expect(page.getByRole("heading", { name: "Mineradio" })).toBeVisible();
 });
+
+test("plugin settings support global toggles and project inheritance", async ({ page }) => {
+  await page.goto("/tests/e2e/demo.html");
+  await page.getByRole("button", { name: "插件 2" }).click();
+
+  const browserToggle = page.getByRole("checkbox", { name: "Browser 状态" });
+  await expect(browserToggle).toBeChecked();
+  await browserToggle.locator("..").click();
+  await expect(browserToggle).not.toBeChecked();
+  await page.getByRole("button", { name: "保存配置" }).click();
+  await expect(page.getByText("资源配置已保存。")).toBeVisible();
+
+  await page.getByRole("button", { name: "项目 1" }).click();
+  const browserSetting = page.getByRole("group", { name: "Browser 设置" });
+  await expect(browserSetting.getByRole("radio", { name: "继承" })).toBeChecked();
+  await browserSetting.getByRole("radio", { name: "停用" }).locator("..").click();
+  await page.getByRole("button", { name: "保存配置" }).click();
+  await expect(browserSetting.getByRole("radio", { name: "停用" })).toBeChecked();
+});
+
+test("MCP settings support global and project controls", async ({ page }) => {
+  await page.goto("/tests/e2e/demo.html");
+  await page.getByRole("button", { name: "MCP 2" }).click();
+
+  const localToggle = page.getByRole("checkbox", { name: "local-tools 状态" });
+  await localToggle.locator("..").click();
+  await expect(localToggle).not.toBeChecked();
+  await page.getByRole("button", { name: "保存配置" }).click();
+  await page.getByRole("button", { name: "项目 1" }).click();
+  const setting = page.getByRole("group", { name: "local-tools 设置" });
+  await expect(setting.getByRole("radio", { name: "停用" })).toBeChecked();
+  await setting.getByRole("radio", { name: "继承" }).locator("..").click();
+  await page.getByRole("button", { name: "保存配置" }).click();
+  await expect(setting.getByRole("radio", { name: "继承" })).toBeChecked();
+});

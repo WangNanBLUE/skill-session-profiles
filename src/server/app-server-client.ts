@@ -4,12 +4,14 @@ import { delimiter, dirname } from "node:path";
 import type {
   ConfigReadResponse,
   ConfigWriteResponse,
+  PluginListResponse,
+  ResourceToggleEntry,
   SkillConfigEntry,
   SkillsListResponse,
 } from "../shared/contracts.js";
 
 const DEFAULT_REQUEST_TIMEOUT_MS = 10_000;
-const MAX_BUFFERED_LINE_LENGTH = 1024 * 1024;
+const MAX_BUFFERED_LINE_LENGTH = 32 * 1024 * 1024;
 
 type RequestId = number;
 
@@ -252,6 +254,13 @@ export class AppServerClient {
     });
   }
 
+  listPlugins(): Promise<PluginListResponse> {
+    return this.request("plugin/list", {
+      cursor: null,
+      limit: 200,
+    });
+  }
+
   readConfig(cwd?: string): Promise<ConfigReadResponse> {
     return this.request("config/read", {
       includeLayers: true,
@@ -274,6 +283,26 @@ export class AppServerClient {
       expectedVersion,
       reloadUserConfig: false,
     });
+  }
+
+  batchWriteResourceConfig(
+    namespace: "plugins" | "mcp_servers",
+    value: ResourceToggleEntry[],
+    expectedVersion: string,
+  ): Promise<ConfigWriteResponse> {
+    return this.request("config/batchWrite", {
+      edits: value.map((entry) => ({
+        keyPath: `${namespace}.${JSON.stringify(entry.id)}.enabled`,
+        value: entry.enabled,
+        mergeStrategy: "upsert",
+      })),
+      expectedVersion,
+      reloadUserConfig: true,
+    });
+  }
+
+  reloadMcpServers(): Promise<Record<string, never>> {
+    return this.request("config/mcpServer/reload", {});
   }
 
   async readFile(path: string): Promise<string> {
