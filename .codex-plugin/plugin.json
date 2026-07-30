@@ -1,6 +1,6 @@
 {
   "name": "skill-session-profiles",
-  "version": "0.2.0+codex.20260730",
+  "version": "0.2.0+codex.20260730065757",
   "description": "Manage global and project-specific skill defaults and reusable profiles for subsequent Codex tasks.",
   "author": {
     "name": "Blue"
@@ -18,9 +18,8 @@
     ],
     "defaultPrompt": [
       "Open the skill profile panel.",
-      "Configure skills for subsequent Codex tasks.",
-      "Configure skills for a Codex project.",
-      "Manage my global skill defaults."
+      "Configure global or task skills for subsequent Codex tasks.",
+      "Configure skills for a Codex project."
     ]
   },
   "mcpServers": "./.mcp.json"

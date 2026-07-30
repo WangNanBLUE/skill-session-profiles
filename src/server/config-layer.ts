@@ -33,7 +33,10 @@ export function extractUserSkillLayer(response: ConfigReadResponse): UserSkillLa
 
 export function extractProjectSkillLayer(response: ConfigReadResponse, cwd: string) {
   const layers = (response.layers ?? [])
-    .filter(({ name }) => name.type === "project" && name.dotCodexFolder)
+    .filter(({ name, disabledReason }) =>
+      name.type === "project"
+      && name.dotCodexFolder
+      && disabledReason == null)
     .sort((a, b) => b.name.dotCodexFolder!.length - a.name.dotCodexFolder!.length);
   const layer = layers[0];
   return {

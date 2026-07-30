@@ -54,10 +54,13 @@ Saving a profile only updates the reusable template. Selecting and applying it
 from Task Configuration writes its explicit overrides to the user-level
 configuration; editing the template later does not silently reapply it.
 
-Project configurations contain explicit overrides only. Skills without a
-project override continue to inherit the global default. Explicit project
-settings take precedence and load when a task for that project is opened,
-resumed, or derived.
+Project configurations contain explicit overrides only. The app updates those
+tables through the Codex App Server filesystem API while preserving unrelated
+TOML and comments. Skills without a project override continue to inherit the
+global default. A session-start hook converts the saved project layer into an
+authoritative task policy, so project settings remain effective on Codex
+versions that parse project-scoped `skills.config` but do not apply it during
+skill discovery.
 
 User data is stored locally at:
 

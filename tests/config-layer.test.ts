@@ -40,3 +40,21 @@ it("resolves the nearest project skill layer or the selected project path", () =
     filePath: "/new-repo/.codex/config.toml",
   });
 });
+
+it("ignores disabled project layers", () => {
+  const response: ConfigReadResponse = {
+    config: {}, origins: {},
+    layers: [{
+      name: { type: "project", dotCodexFolder: "/repo/.codex" },
+      version: "project-v1",
+      disabledReason: "project is not trusted",
+      config: { skills: { config: [{ path: "/project", enabled: false }] } },
+    }],
+  };
+
+  expect(extractProjectSkillLayer(response, "/repo")).toEqual({
+    version: null,
+    value: [],
+    filePath: "/repo/.codex/config.toml",
+  });
+});

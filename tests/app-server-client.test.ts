@@ -343,30 +343,47 @@ describe("AppServerClient", () => {
     await client.close();
   });
 
-  it("targets a project config file when requested", async () => {
+  it("reads and writes project config through the filesystem API", async () => {
     const { client, transport } = await createInitializedClient();
-    const pending = client.batchWriteSkillsConfig(
-      [{ path: "/skills/one", enabled: false }],
-      "project-v1",
-      "/repo/.codex/config.toml",
-    );
+    const read = client.readFile("/repo/.codex/config.toml");
     await vi.waitFor(() => expect(transport.messages()).toHaveLength(3));
     expect(transport.messages()[2]).toMatchObject({
-      method: "config/batchWrite",
-      params: {
-        filePath: "/repo/.codex/config.toml",
-        expectedVersion: "project-v1",
-        reloadUserConfig: false,
-      },
+      method: "fs/readFile",
+      params: { path: "/repo/.codex/config.toml" },
     });
     transport.emitLine({
       id: transport.messages()[2].id,
-      result: {
-        status: "ok", version: "project-v2",
-        filePath: "/repo/.codex/config.toml", overriddenMetadata: null,
+      result: { dataBase64: Buffer.from('model = "gpt-5"\n').toString("base64") },
+    });
+    await expect(read).resolves.toBe('model = "gpt-5"\n');
+
+    const write = client.writeFile("/repo/.codex/config.toml", "enabled = true\n");
+    await vi.waitFor(() => expect(transport.messages()).toHaveLength(4));
+    expect(transport.messages()[3]).toMatchObject({
+      method: "fs/writeFile",
+      params: {
+        path: "/repo/.codex/config.toml",
+        dataBase64: Buffer.from("enabled = true\n").toString("base64"),
       },
     });
-    await pending;
+    transport.emitLine({ id: transport.messages()[3].id, result: {} });
+    await write;
+
+    const readDirectory = client.readDirectory("/repo/.codex");
+    await vi.waitFor(() => expect(transport.messages()).toHaveLength(5));
+    expect(transport.messages()[4]).toMatchObject({
+      method: "fs/readDirectory",
+      params: { path: "/repo/.codex" },
+    });
+    transport.emitLine({
+      id: transport.messages()[4].id,
+      result: {
+        entries: [{ fileName: "config.toml", isDirectory: false, isFile: true }],
+      },
+    });
+    await expect(readDirectory).resolves.toEqual([
+      { fileName: "config.toml", isDirectory: false, isFile: true },
+    ]);
     await client.close();
   });
 

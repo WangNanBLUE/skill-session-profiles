@@ -1,9 +1,10 @@
 import { createHash, randomUUID } from "node:crypto";
-import { isAbsolute, normalize } from "node:path";
+import { basename, dirname, isAbsolute, normalize } from "node:path";
 
 import type { AppServerClient } from "./app-server-client.js";
 import { extractProjectSkillLayer, extractUserSkillLayer } from "./config-layer.js";
 import { JsonStore } from "./json-store.js";
+import { replaceProjectSkillConfig } from "./project-config.js";
 import {
   skillProfileSchema,
   type PendingFile,
@@ -136,7 +137,6 @@ export class ProfileService {
   }
 
   async saveProjectConfiguration(cwd: string, overrides: SkillOverride[]): Promise<SkillConfigEntry[]> {
-    await this.requireBatchWrite();
     return this.store.withLock(async () => {
       const inventory = await this.client.listSkills([cwd], true);
       const layer = extractProjectSkillLayer(await this.client.readConfig(cwd), cwd);
@@ -151,7 +151,15 @@ export class ProfileService {
         path,
         enabled: state === "enabled",
       })));
-      await this.client.batchWriteSkillsConfig(value, layer.version, layer.filePath);
+      const directory = dirname(layer.filePath);
+      await this.client.createDirectory(directory);
+      const entries = await this.client.readDirectory(directory);
+      const source = entries.some((entry) =>
+        entry.fileName === basename(layer.filePath) && entry.isFile)
+        ? await this.client.readFile(layer.filePath)
+        : "";
+      const updated = replaceProjectSkillConfig(source, value);
+      await this.client.writeFile(layer.filePath, updated);
       await this.store.appendAudit({ action: "project-config-saved", cwd });
       return value;
     });
@@ -196,10 +204,10 @@ export class ProfileService {
   }
 
   async restore(consumerSessionId?: string): Promise<{ restored: boolean; conflictPaths?: string[] }> {
-    await this.requireBatchWrite();
     return this.store.withLock(async () => {
       const pending = await this.store.readPending();
       if (!pending) return { restored: false };
+      await this.requireBatchWrite();
       const layer = extractUserSkillLayer(await this.client.readConfig(pending.cwd));
       const currentHash = hashConfig(layer.value);
       if (pending.state === "prepared" && currentHash === pending.baselineHash) {

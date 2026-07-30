@@ -261,8 +261,7 @@ export class AppServerClient {
 
   batchWriteSkillsConfig(
     value: SkillConfigEntry[],
-    expectedVersion: string | null,
-    filePath?: string,
+    expectedVersion: string,
   ): Promise<ConfigWriteResponse> {
     return this.request("config/batchWrite", {
       edits: [
@@ -273,9 +272,35 @@ export class AppServerClient {
         },
       ],
       expectedVersion,
-      ...(filePath === undefined ? {} : { filePath }),
       reloadUserConfig: false,
     });
+  }
+
+  async readFile(path: string): Promise<string> {
+    const response = await this.request<{ dataBase64: string }>("fs/readFile", { path });
+    return Buffer.from(response.dataBase64, "base64").toString("utf8");
+  }
+
+  async writeFile(path: string, value: string): Promise<void> {
+    await this.request("fs/writeFile", {
+      path,
+      dataBase64: Buffer.from(value, "utf8").toString("base64"),
+    });
+  }
+
+  async readDirectory(path: string): Promise<Array<{
+    fileName: string;
+    isDirectory: boolean;
+    isFile: boolean;
+  }>> {
+    const response = await this.request<{
+      entries: Array<{ fileName: string; isDirectory: boolean; isFile: boolean }>;
+    }>("fs/readDirectory", { path });
+    return response.entries;
+  }
+
+  async createDirectory(path: string): Promise<void> {
+    await this.request("fs/createDirectory", { path, recursive: true });
   }
 
   canBatchWrite(): Promise<boolean> {

@@ -30,6 +30,12 @@ function fakeClient(paths = ["/skills/a/SKILL.md"]) {
     })), errors: [] }] }),
     readConfig,
     batchWriteSkillsConfig: vi.fn(),
+    readFile: vi.fn().mockResolvedValue('model = "gpt-5"\n'),
+    writeFile: vi.fn(),
+    readDirectory: vi.fn().mockResolvedValue([
+      { fileName: "config.toml", isDirectory: false, isFile: true },
+    ]),
+    createDirectory: vi.fn(),
     canBatchWrite: vi.fn().mockResolvedValue(true),
   } as unknown as AppServerClient;
 }
@@ -73,18 +79,25 @@ describe("profile resolution", () => {
     expect(await setup.store.readPending()).toBeUndefined();
   });
 
-  it("writes explicit project overrides to the project config layer", async () => {
+  it("writes project overrides through the filesystem API without replacing other config", async () => {
     const setup = await service();
     await expect(setup.service.saveProjectConfiguration("/repo", [
       { path: "/skills/a/SKILL.md", state: "disabled" },
     ])).resolves.toEqual([
       { path: "/skills/a/SKILL.md", enabled: false },
     ]);
-    expect(setup.client.batchWriteSkillsConfig).toHaveBeenCalledWith(
-      [{ path: "/skills/a/SKILL.md", enabled: false }],
-      "project-v1",
+    expect(setup.client.writeFile).toHaveBeenCalledWith(
       "/repo/.codex/config.toml",
+      [
+        'model = "gpt-5"',
+        "",
+        "[[skills.config]]",
+        'path = "/skills/a/SKILL.md"',
+        "enabled = false",
+        "",
+      ].join("\n"),
     );
+    expect(setup.client.batchWriteSkillsConfig).not.toHaveBeenCalled();
   });
 
   it("promotes a prepared transaction when the target was committed", async () => {
@@ -107,5 +120,16 @@ describe("profile resolution", () => {
     });
     await setup.service.reconcile();
     expect(await setup.store.readPending()).toMatchObject({ state: "armed", expectedVersion: "v2" });
+  });
+
+  it("does not require user-config writes when there is nothing to restore", async () => {
+    const client = fakeClient() as unknown as {
+      canBatchWrite: ReturnType<typeof vi.fn>;
+    };
+    client.canBatchWrite.mockResolvedValue(false);
+    const setup = await service(client as unknown as AppServerClient);
+
+    await expect(setup.service.restore("s1")).resolves.toEqual({ restored: false });
+    expect(client.canBatchWrite).not.toHaveBeenCalled();
   });
 });

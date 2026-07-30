@@ -23,7 +23,9 @@
     "test:codex-integration": "vitest run --config vitest.integration.config.ts",
     "test:electron": "npm run build && playwright test --config playwright.electron.config.ts"
   },
-  "dependencies": {},
+  "dependencies": {
+    "toml-eslint-parser": "^1.0.3"
+  },
   "devDependencies": {
     "@modelcontextprotocol/ext-apps": "1.7.5",
     "@modelcontextprotocol/sdk": "1.30.0",

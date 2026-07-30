@@ -18,6 +18,10 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Fixed
 
 - Keep the real Codex app-server integration test out of portable GitHub CI.
+- Save project configuration through the Codex App Server filesystem API
+  instead of the user-only `config/batchWrite` endpoint.
+- Enforce saved project skill configuration through the session-start hook when
+  Codex skill discovery ignores the parsed project layer.
 
 ## [0.1.0] - 2026-07-29
 

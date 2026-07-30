@@ -15,7 +15,8 @@ After the user applies a profile:
 3. Explain that applying another configuration or changing global defaults replaces it.
 
 After the user saves a project configuration, explain that it applies only to that project and
-that reopened, resumed, or derived tasks load it. Unset skills inherit global defaults.
+that the plugin's session-start policy enforces it for reopened, resumed, or derived tasks. Unset
+skills inherit global defaults.
 
 Do not create, fork, navigate, or restart a task on the user's behalf. Do not claim that an
 already loaded task can hot-switch skills. Explain that existing tasks pick up the configuration
