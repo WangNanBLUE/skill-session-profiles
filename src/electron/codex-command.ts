@@ -15,6 +15,8 @@ export async function resolveCodexCommand(): Promise<string> {
     ...pathCandidates(process.env.PATH),
     "/opt/homebrew/bin/codex",
     "/usr/local/bin/codex",
+    "/Applications/ChatGPT.app/Contents/Resources/codex",
+    join(home, "Applications", "ChatGPT.app", "Contents", "Resources", "codex"),
     join(home, ".local", "bin", "codex"),
     join(home, ".volta", "bin", "codex"),
     join(home, ".asdf", "shims", "codex"),
