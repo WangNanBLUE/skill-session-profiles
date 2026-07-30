@@ -12,11 +12,18 @@ function extractSkillConfig(config: unknown): SkillConfigEntry[] {
   if (value === undefined) return [];
   if (!Array.isArray(value)) throw new Error("skills.config is not an array");
   return value.map((entry) => {
-    const item = entry as Partial<SkillConfigEntry>;
-    if (typeof item.path !== "string" || typeof item.enabled !== "boolean") {
+    const item = entry as { path?: unknown; name?: unknown; enabled?: unknown };
+    if (
+      typeof item.enabled !== "boolean"
+      || (typeof item.path !== "string" && typeof item.name !== "string")
+    ) {
       throw new Error("invalid skills.config entry");
     }
-    return { path: item.path, enabled: item.enabled, ...(item.name ? { name: item.name } : {}) };
+    return {
+      ...(typeof item.path === "string" ? { path: item.path } : {}),
+      ...(typeof item.name === "string" ? { name: item.name } : {}),
+      enabled: item.enabled,
+    } as SkillConfigEntry;
   });
 }
 

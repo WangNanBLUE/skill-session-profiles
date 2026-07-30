@@ -1,6 +1,6 @@
 {
   "name": "skill-session-profiles",
-  "version": "0.2.0+codex.20260730065757",
+  "version": "0.2.1+codex.20260730162000",
   "description": "Manage global and project-specific skill defaults and reusable profiles for subsequent Codex tasks.",
   "author": {
     "name": "Blue"

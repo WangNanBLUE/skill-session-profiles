@@ -7,6 +7,7 @@ import {
   profilesFileSchema,
   skillConfigEntrySchema,
   skillOverrideSchema,
+  type SkillConfigEntry,
 } from "../shared/contracts.js";
 import { z } from "zod";
 
@@ -94,8 +95,15 @@ export class SkillProfileBackend {
     ]);
     return {
       skills: inventory.data[0]?.skills ?? [],
-      globalDefaults: extractUserSkillLayer(config).value,
-      projectConfig: extractProjectSkillLayer(config, cwd),
+      globalDefaults: extractUserSkillLayer(config).value.filter(
+        (entry): entry is SkillConfigEntry & { path: string } => entry.path !== undefined,
+      ),
+      projectConfig: {
+        ...extractProjectSkillLayer(config, cwd),
+        value: extractProjectSkillLayer(config, cwd).value.filter(
+          (entry): entry is SkillConfigEntry & { path: string } => entry.path !== undefined,
+        ),
+      },
       projects,
       profiles: profiles.profiles,
       pending: pending ?? null,

@@ -14,13 +14,23 @@ import {
 } from "../shared/contracts.js";
 
 export function canonicalize(entries: SkillConfigEntry[]): SkillConfigEntry[] {
-  const byPath = new Map<string, SkillConfigEntry>();
+  const bySelector = new Map<string, SkillConfigEntry>();
   for (const entry of entries) {
-    const path = normalize(entry.path);
-    if (!isAbsolute(path)) throw new Error(`skill path must be absolute: ${entry.path}`);
-    byPath.set(path, { ...entry, path });
+    if (entry.path !== undefined) {
+      const path = normalize(entry.path);
+      if (!isAbsolute(path)) throw new Error(`skill path must be absolute: ${entry.path}`);
+      bySelector.set(`path:${path}`, { ...entry, path });
+    } else {
+      bySelector.set(`name:${entry.name}`, entry);
+    }
   }
-  return [...byPath.values()].sort((a, b) => a.path.localeCompare(b.path));
+  return [...bySelector.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([, entry]) => entry);
+}
+
+function selectorKey(entry: SkillConfigEntry): string {
+  return entry.path === undefined ? `name:${entry.name}` : `path:${normalize(entry.path)}`;
 }
 
 export function hashConfig(entries: SkillConfigEntry[]): string {
@@ -31,11 +41,14 @@ export function resolveTarget(
   baseline: SkillConfigEntry[],
   overrides: SkillOverride[],
 ): SkillConfigEntry[] {
-  const result = new Map(canonicalize(baseline).map((entry) => [entry.path, entry]));
+  const result = new Map(canonicalize(baseline).map((entry) => [selectorKey(entry), entry]));
   for (const override of overrides) {
     const path = normalize(override.path);
     if (!isAbsolute(path)) throw new Error(`skill path must be absolute: ${override.path}`);
-    result.set(path, { ...(result.get(path) ?? { path }), enabled: override.state === "enabled" });
+    result.set(`path:${path}`, {
+      ...(result.get(`path:${path}`) ?? { path }),
+      enabled: override.state === "enabled",
+    });
   }
   return canonicalize([...result.values()]);
 }
@@ -108,10 +121,15 @@ export class ProfileService {
       const layer = extractUserSkillLayer(await this.client.readConfig(cwd));
       const allowed = new Set([
         ...inventory.data.flatMap((item) => item.skills.map((skill) => normalize(skill.path))),
-        ...layer.value.map((item) => normalize(item.path)),
+        ...layer.value.flatMap((item) => item.path === undefined ? [] : [normalize(item.path)]),
       ]);
-      const normalized = canonicalize(value);
-      if (normalized.some((entry) => !allowed.has(entry.path))) throw new Error("unknown skill path");
+      const normalized = canonicalize([
+        ...layer.value.filter((entry) => entry.path === undefined),
+        ...value,
+      ]);
+      if (normalized.some((entry) => entry.path !== undefined && !allowed.has(entry.path))) {
+        throw new Error("unknown skill path");
+      }
       await this.client.batchWriteSkillsConfig(normalized, layer.version);
     });
   }
@@ -124,7 +142,7 @@ export class ProfileService {
       const layer = extractUserSkillLayer(await this.client.readConfig(cwd));
       const allowed = new Set([
         ...inventory.data.flatMap((item) => item.skills.map((skill) => normalize(skill.path))),
-        ...layer.value.map((entry) => normalize(entry.path)),
+        ...layer.value.flatMap((entry) => entry.path === undefined ? [] : [normalize(entry.path)]),
       ]);
       if (overrides.some((override) => !allowed.has(normalize(override.path)))) {
         throw new Error("unknown skill path");
@@ -142,15 +160,18 @@ export class ProfileService {
       const layer = extractProjectSkillLayer(await this.client.readConfig(cwd), cwd);
       const allowed = new Set([
         ...inventory.data.flatMap((item) => item.skills.map((skill) => normalize(skill.path))),
-        ...layer.value.map((entry) => normalize(entry.path)),
+        ...layer.value.flatMap((entry) => entry.path === undefined ? [] : [normalize(entry.path)]),
       ]);
       if (overrides.some((override) => !allowed.has(normalize(override.path)))) {
         throw new Error("unknown skill path");
       }
-      const value = canonicalize(overrides.map(({ path, state }) => ({
-        path,
-        enabled: state === "enabled",
-      })));
+      const value = canonicalize([
+        ...layer.value.filter((entry) => entry.path === undefined),
+        ...overrides.map(({ path, state }) => ({
+          path,
+          enabled: state === "enabled",
+        })),
+      ]);
       const directory = dirname(layer.filePath);
       await this.client.createDirectory(directory);
       const entries = await this.client.readDirectory(directory);
@@ -173,7 +194,7 @@ export class ProfileService {
       const layer = extractUserSkillLayer(await this.client.readConfig(cwd));
       const allowed = new Set([
         ...inventory.data.flatMap((item) => item.skills.map((skill) => normalize(skill.path))),
-        ...layer.value.map((entry) => normalize(entry.path)),
+        ...layer.value.flatMap((entry) => entry.path === undefined ? [] : [normalize(entry.path)]),
       ]);
       if (overrides.some((override) => !allowed.has(normalize(override.path)))) {
         throw new Error("unknown skill path");
@@ -217,9 +238,9 @@ export class ProfileService {
       if (currentHash !== pending.targetHash) {
         pending.state = "conflict";
         await this.store.writePending(pending);
-        const baseline = new Map(pending.baseline.map((x) => [x.path, x.enabled]));
-        const target = new Map(pending.target.map((x) => [x.path, x.enabled]));
-        const current = new Map(canonicalize(layer.value).map((x) => [x.path, x.enabled]));
+        const baseline = new Map(pending.baseline.map((x) => [selectorKey(x), x.enabled]));
+        const target = new Map(pending.target.map((x) => [selectorKey(x), x.enabled]));
+        const current = new Map(canonicalize(layer.value).map((x) => [selectorKey(x), x.enabled]));
         const paths = new Set([...baseline.keys(), ...target.keys(), ...current.keys()]);
         return { restored: false, conflictPaths: [...paths].filter((p) => current.get(p) !== target.get(p)) };
       }

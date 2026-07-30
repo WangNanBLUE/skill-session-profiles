@@ -18,6 +18,22 @@ describe("extractUserSkillLayer", () => {
       value: [{ path: "/user", enabled: true }],
     });
   });
+
+  it("preserves valid name-based skill selectors", () => {
+    const response: ConfigReadResponse = {
+      config: {}, origins: {},
+      layers: [{
+        name: { type: "user", profile: null },
+        version: "user-v1",
+        config: { skills: { config: [{ name: "skill-creator", enabled: false }] } },
+      }],
+    };
+
+    expect(extractUserSkillLayer(response)).toEqual({
+      version: "user-v1",
+      value: [{ name: "skill-creator", enabled: false }],
+    });
+  });
 });
 
 it("resolves the nearest project skill layer or the selected project path", () => {

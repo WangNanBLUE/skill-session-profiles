@@ -7,6 +7,8 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-07-30
+
 ### Added
 
 - Public repository documentation and GitHub contribution workflows.
@@ -22,6 +24,8 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   instead of the user-only `config/batchWrite` endpoint.
 - Enforce saved project skill configuration through the session-start hook when
   Codex skill discovery ignores the parsed project layer.
+- Accept and preserve Codex skill configuration selected by skill name as well
+  as by absolute path.
 
 ## [0.1.0] - 2026-07-29
 

@@ -115,4 +115,24 @@ describe("renderProjectSkillPolicy", () => {
     expect(context).toContain("Effective enabled skills (authoritative): none.");
     expect(context).toContain("Do not invoke or read any skill not in this exact set");
   });
+
+  it("matches name selectors and lets a path selector take precedence", () => {
+    const context = renderProjectSkillPolicy(
+      "/repo",
+      [{
+        name: "review",
+        description: "Review changes.",
+        path: "/skills/review/SKILL.md",
+        scope: "user",
+        enabled: true,
+      }],
+      [{ name: "review", enabled: false }],
+      [
+        { name: "review", enabled: true },
+        { path: "/skills/review/SKILL.md", enabled: false },
+      ],
+    );
+
+    expect(context).toContain("Effective enabled skills (authoritative): none.");
+  });
 });

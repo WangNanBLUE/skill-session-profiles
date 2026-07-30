@@ -1,16 +1,23 @@
 import { z } from "zod";
 
-export interface SkillConfigEntry {
-  path: string;
-  enabled: boolean;
-  name?: string;
-}
+export const skillConfigEntrySchema = z.union([
+  z.object({
+    path: z.string(),
+    enabled: z.boolean(),
+    name: z.string().optional(),
+  }),
+  z.object({
+    name: z.string(),
+    enabled: z.boolean(),
+  }),
+]);
 
-export const skillConfigEntrySchema = z.object({
-  path: z.string(),
-  enabled: z.boolean(),
-  name: z.string().optional(),
-});
+export type SkillConfigEntry = {
+  enabled: boolean;
+} & (
+  | { path: string; name?: string }
+  | { path?: undefined; name: string }
+);
 
 export const skillOverrideSchema = z.object({
   path: z.string(),

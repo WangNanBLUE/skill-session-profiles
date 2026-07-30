@@ -41,7 +41,8 @@ function renderSkillTables(entries: SkillConfigEntry[], newline: string): string
   if (entries.length === 0) return "";
   return `${entries.map((entry) => [
     "[[skills.config]]",
-    `path = ${JSON.stringify(entry.path)}`,
+    ...(entry.path === undefined ? [] : [`path = ${JSON.stringify(entry.path)}`]),
+    ...(entry.name === undefined ? [] : [`name = ${JSON.stringify(entry.name)}`]),
     `enabled = ${String(entry.enabled)}`,
   ].join(newline)).join(`${newline}${newline}`)}${newline}`;
 }

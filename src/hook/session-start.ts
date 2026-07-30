@@ -35,28 +35,31 @@ export function renderProjectSkillPolicy(
 ): string | undefined {
   if (projectConfig.length === 0) return undefined;
 
-  const globalByPath = new Map(
-    globalDefaults.map((entry) => [normalize(entry.path), entry.enabled]),
-  );
-  const projectByPath = new Map(
-    projectConfig.map((entry) => [normalize(entry.path), entry.enabled]),
-  );
+  const settings = (entries: SkillConfigEntry[], skill: SkillMetadata) =>
+    entries.find((entry) => entry.path !== undefined
+      && normalize(entry.path) === normalize(skill.path))?.enabled
+    ?? entries.find((entry) => entry.name === skill.name)?.enabled;
   const globallyEnabled = new Set(
     inventory
-      .filter((skill) => globalByPath.get(normalize(skill.path)) ?? skill.enabled)
+      .filter((skill) => settings(globalDefaults, skill) ?? skill.enabled)
       .map((skill) => normalize(skill.path)),
   );
   const enabled = inventory
     .filter((skill) =>
-      projectByPath.get(normalize(skill.path))
-      ?? globalByPath.get(normalize(skill.path))
+      settings(projectConfig, skill)
+      ?? settings(globalDefaults, skill)
       ?? skill.enabled)
     .sort((a, b) => a.name.localeCompare(b.name));
   const additional = enabled.filter((skill) => !globallyEnabled.has(normalize(skill.path)));
   const inventoryPaths = new Set(inventory.map((skill) => normalize(skill.path)));
+  const inventoryNames = new Set(inventory.map((skill) => skill.name));
   const unavailable = projectConfig
-    .filter((entry) => entry.enabled && !inventoryPaths.has(normalize(entry.path)))
-    .map((entry) => entry.path)
+    .filter((entry) => entry.enabled && (
+      entry.path === undefined
+        ? !inventoryNames.has(entry.name)
+        : !inventoryPaths.has(normalize(entry.path))
+    ))
+    .map((entry) => entry.path ?? entry.name)
     .sort();
 
   const lines = [

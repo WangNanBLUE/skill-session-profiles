@@ -48,4 +48,15 @@ describe("project skill config editing", () => {
       "",
     ].join("\n"));
   });
+
+  it("renders name-based selectors without inventing a path", () => {
+    expect(replaceProjectSkillConfig("", [
+      { name: "skill-creator", enabled: false },
+    ])).toBe([
+      "[[skills.config]]",
+      'name = "skill-creator"',
+      "enabled = false",
+      "",
+    ].join("\n"));
+  });
 });

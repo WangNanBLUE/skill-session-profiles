@@ -59,6 +59,19 @@ describe("profile resolution", () => {
     expect(hashConfig(canonicalize([{ path: "/skills/a/SKILL.md", enabled: false }]))).toHaveLength(64);
   });
 
+  it("preserves name-based selectors while applying path overrides", () => {
+    expect(resolveTarget(
+      [
+        { name: "skill-creator", enabled: false },
+        { path: "/skills/a/SKILL.md", enabled: false },
+      ],
+      [{ path: "/skills/a/SKILL.md", state: "enabled" }],
+    )).toEqual([
+      { name: "skill-creator", enabled: false },
+      { path: "/skills/a/SKILL.md", enabled: true },
+    ]);
+  });
+
   it("rejects an arm override outside the current inventory and user layer", async () => {
     const { service: profiles } = await service();
     await expect(profiles.arm("/repo", null, "Unsafe", [
