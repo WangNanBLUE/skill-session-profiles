@@ -58,6 +58,12 @@ export interface SkillMetadata {
   enabled: boolean;
 }
 
+export interface CodexProject {
+  id: string;
+  name: string;
+  rootPaths: string[];
+}
+
 export interface SkillsListResponse {
   data: Array<{
     cwd: string;
@@ -77,6 +83,7 @@ export interface ConfigReadResponse {
       type: string;
       file?: string;
       profile?: string | null;
+      dotCodexFolder?: string;
     };
     version: string;
     config: unknown;

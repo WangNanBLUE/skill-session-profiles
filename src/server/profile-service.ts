@@ -2,7 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { isAbsolute, normalize } from "node:path";
 
 import type { AppServerClient } from "./app-server-client.js";
-import { extractUserSkillLayer } from "./config-layer.js";
+import { extractProjectSkillLayer, extractUserSkillLayer } from "./config-layer.js";
 import { JsonStore } from "./json-store.js";
 import {
   skillProfileSchema,
@@ -132,6 +132,28 @@ export class ProfileService {
       await this.client.batchWriteSkillsConfig(target, layer.version);
       await this.store.appendAudit({ action: "applied", cwd });
       return target;
+    });
+  }
+
+  async saveProjectConfiguration(cwd: string, overrides: SkillOverride[]): Promise<SkillConfigEntry[]> {
+    await this.requireBatchWrite();
+    return this.store.withLock(async () => {
+      const inventory = await this.client.listSkills([cwd], true);
+      const layer = extractProjectSkillLayer(await this.client.readConfig(cwd), cwd);
+      const allowed = new Set([
+        ...inventory.data.flatMap((item) => item.skills.map((skill) => normalize(skill.path))),
+        ...layer.value.map((entry) => normalize(entry.path)),
+      ]);
+      if (overrides.some((override) => !allowed.has(normalize(override.path)))) {
+        throw new Error("unknown skill path");
+      }
+      const value = canonicalize(overrides.map(({ path, state }) => ({
+        path,
+        enabled: state === "enabled",
+      })));
+      await this.client.batchWriteSkillsConfig(value, layer.version, layer.filePath);
+      await this.store.appendAudit({ action: "project-config-saved", cwd });
+      return value;
     });
   }
 

@@ -1,4 +1,5 @@
-import { extractUserSkillLayer } from "./config-layer.js";
+import { extractProjectSkillLayer, extractUserSkillLayer } from "./config-layer.js";
+import { listCodexProjects } from "./codex-projects.js";
 import { type AppServerClient } from "./app-server-client.js";
 import { JsonStore } from "./json-store.js";
 import { ProfileService } from "./profile-service.js";
@@ -41,6 +42,13 @@ const callSchema = z.discriminatedUnion("name", [
     }),
   }),
   z.object({
+    name: z.literal("save_project_skill_configuration"),
+    args: z.object({
+      cwd: z.string().refine((value) => value.startsWith("/")),
+      overrides: z.array(skillOverrideSchema),
+    }),
+  }),
+  z.object({
     name: z.literal("arm_next_session_profile"),
     args: z.object({
       cwd: z.string().refine((value) => value.startsWith("/")),
@@ -76,16 +84,19 @@ export class SkillProfileBackend {
 
   async state(cwd: string) {
     await this.service.reconcile();
-    const [inventory, config, profiles, pending, writable] = await Promise.all([
+    const [inventory, config, profiles, pending, writable, projects] = await Promise.all([
       this.client.listSkills([cwd]),
       this.client.readConfig(cwd),
       this.store.readProfiles(),
       this.store.readPending(),
       this.client.canBatchWrite(),
+      listCodexProjects(),
     ]);
     return {
       skills: inventory.data[0]?.skills ?? [],
       globalDefaults: extractUserSkillLayer(config).value,
+      projectConfig: extractProjectSkillLayer(config, cwd),
+      projects,
       profiles: profiles.profiles,
       pending: pending ?? null,
       writable,
@@ -107,6 +118,8 @@ export class SkillProfileBackend {
         return { deleted: input.args.id };
       case "apply_skill_configuration":
         return { value: await this.service.applyPersistent(input.args.cwd, input.args.overrides) };
+      case "save_project_skill_configuration":
+        return { value: await this.service.saveProjectConfiguration(input.args.cwd, input.args.overrides) };
       case "arm_next_session_profile":
         return {
           pending: await this.service.arm(

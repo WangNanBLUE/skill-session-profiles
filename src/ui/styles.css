@@ -616,12 +616,42 @@ dd {
 }
 
 .content-pane {
+  position: relative;
   display: flex;
   min-width: 0;
   min-height: 0;
   flex-direction: column;
   overflow: hidden;
   background: var(--canvas);
+}
+
+.project-switch-progress {
+  position: absolute;
+  z-index: 4;
+  top: 0;
+  left: 0;
+  width: 35%;
+  height: 2px;
+  background: var(--accent);
+  animation: project-switch-progress 1.1s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes project-switch-progress {
+  0% {
+    transform: translateX(-100%);
+  }
+
+  100% {
+    transform: translateX(386%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .project-switch-progress {
+    width: 100%;
+    animation: none;
+  }
 }
 
 .pane-header {
@@ -674,6 +704,24 @@ dd {
 
 .pane-actions {
   gap: var(--space-sm);
+}
+
+.project-root-select {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  color: var(--ink-secondary);
+  font-size: 12px;
+}
+
+.project-root-select select {
+  min-height: 34px;
+  max-width: 220px;
+  padding: 0 28px 0 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  background: var(--surface);
 }
 
 .primary-button,

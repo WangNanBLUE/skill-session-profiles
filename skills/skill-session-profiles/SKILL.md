@@ -1,6 +1,6 @@
 ---
 name: skill-session-profiles
-description: Open and use the Skill Session Profiles panel to manage global Codex skill defaults, reusable skill profiles, or the persistent configuration used by subsequently opened tasks. Use when the user asks which skills should be enabled for tasks, wants to save or apply a skill configuration, or wants to change global skill defaults.
+description: Open and use the Skill Session Profiles panel to manage global or project-specific Codex skill defaults, reusable skill profiles, or the persistent configuration used by subsequently opened tasks. Use when the user asks which skills should be enabled for tasks or projects, wants to save or apply a skill configuration, or wants to change global skill defaults.
 ---
 
 # Skill Session Profiles
@@ -13,6 +13,9 @@ After the user applies a profile:
 1. Confirm that the panel applied the selected configuration.
 2. Explain that subsequently opened, resumed, or forked Codex tasks will use it.
 3. Explain that applying another configuration or changing global defaults replaces it.
+
+After the user saves a project configuration, explain that it applies only to that project and
+that reopened, resumed, or derived tasks load it. Unset skills inherit global defaults.
 
 Do not create, fork, navigate, or restart a task on the user's behalf. Do not claim that an
 already loaded task can hot-switch skills. Explain that existing tasks pick up the configuration

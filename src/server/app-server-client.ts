@@ -1,4 +1,5 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { delimiter, dirname } from "node:path";
 
 import type {
   ConfigReadResponse,
@@ -32,6 +33,21 @@ export interface LineTransport {
   close(): Promise<void>;
 }
 
+export function codexChildEnvironment(
+  codexCommand: string,
+  environment: NodeJS.ProcessEnv = process.env,
+): NodeJS.ProcessEnv {
+  const commandDirectory = dirname(codexCommand);
+  const pathEntries = (environment.PATH ?? "").split(delimiter).filter(Boolean);
+  return {
+    ...environment,
+    PATH: [
+      commandDirectory,
+      ...pathEntries.filter((entry) => entry !== commandDirectory),
+    ].join(delimiter),
+  };
+}
+
 export class CodexAppServerLineTransport implements LineTransport {
   private readonly child: ChildProcessWithoutNullStreams;
   private readonly lineListeners = new Set<(line: string) => void>();
@@ -44,6 +60,7 @@ export class CodexAppServerLineTransport implements LineTransport {
 
   constructor(codexCommand = "codex") {
     this.child = spawn(codexCommand, ["app-server", "--stdio"], {
+      env: codexChildEnvironment(codexCommand),
       shell: false,
       stdio: ["pipe", "pipe", "pipe"],
     });
@@ -244,7 +261,8 @@ export class AppServerClient {
 
   batchWriteSkillsConfig(
     value: SkillConfigEntry[],
-    expectedVersion: string,
+    expectedVersion: string | null,
+    filePath?: string,
   ): Promise<ConfigWriteResponse> {
     return this.request("config/batchWrite", {
       edits: [
@@ -255,6 +273,7 @@ export class AppServerClient {
         },
       ],
       expectedVersion,
+      ...(filePath === undefined ? {} : { filePath }),
       reloadUserConfig: false,
     });
   }

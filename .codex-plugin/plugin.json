@@ -1,7 +1,7 @@
 {
   "name": "skill-session-profiles",
-  "version": "0.1.0+codex.20260729020238",
-  "description": "Manage global skill defaults and apply reusable skill profiles to subsequent Codex tasks.",
+  "version": "0.2.0+codex.20260730",
+  "description": "Manage global and project-specific skill defaults and reusable profiles for subsequent Codex tasks.",
   "author": {
     "name": "Blue"
   },
@@ -9,7 +9,7 @@
   "interface": {
     "displayName": "Skill Session Profiles",
     "shortDescription": "Control skills for subsequent Codex tasks",
-    "longDescription": "Manage global skill defaults, save reusable profiles, and apply one configuration to subsequently opened, resumed, or forked Codex tasks.",
+    "longDescription": "Manage global and project-specific skill defaults, save reusable profiles, and apply one configuration to subsequently opened, resumed, or forked Codex tasks.",
     "developerName": "Blue",
     "category": "Productivity",
     "capabilities": [
@@ -19,6 +19,7 @@
     "defaultPrompt": [
       "Open the skill profile panel.",
       "Configure skills for subsequent Codex tasks.",
+      "Configure skills for a Codex project.",
       "Manage my global skill defaults."
     ]
   },

@@ -18,6 +18,11 @@ const profiles: SkillProfile[] = [
 let state = {
   skills,
   globalDefaults: skills.map(({ path, enabled }) => ({ path, enabled })),
+  projectConfig: { value: [], filePath: "/Users/demo/projects/demo-project/.codex/config.toml" },
+  projects: [
+    { id: "demo", name: "demo-project", rootPaths: ["/Users/demo/projects/demo-project", "/Users/demo/projects/demo-site"] },
+    { id: "radio", name: "Mineradio", rootPaths: ["/Users/demo/projects/Mineradio"] },
+  ],
   profiles,
   pending: null,
   writable: true,

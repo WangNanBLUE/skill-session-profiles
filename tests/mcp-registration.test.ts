@@ -38,6 +38,9 @@ it("registers the panel tool through the packaged MCP configuration", async () =
     expect(tools.tools.map(({ name }) => name)).toContain(
       "apply_skill_configuration",
     );
+    expect(tools.tools.map(({ name }) => name)).toContain(
+      "save_project_skill_configuration",
+    );
   } finally {
     await client.close();
   }

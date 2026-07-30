@@ -15,9 +15,14 @@ afterEach(async () => {
 function fakeClient(paths = ["/skills/a/SKILL.md"]) {
   const readConfig = vi.fn().mockResolvedValue({
     config: {}, origins: {},
-    layers: [{ name: { type: "user", profile: null }, version: "v1", config: {
-      skills: { config: [{ path: "/skills/a/SKILL.md", enabled: false }] },
-    } }],
+    layers: [
+      { name: { type: "user", profile: null }, version: "v1", config: {
+        skills: { config: [{ path: "/skills/a/SKILL.md", enabled: false }] },
+      } },
+      { name: { type: "project", dotCodexFolder: "/repo/.codex" }, version: "project-v1", config: {
+        skills: { config: [] },
+      } },
+    ],
   });
   return {
     listSkills: vi.fn().mockResolvedValue({ data: [{ cwd: "/repo", skills: paths.map((path) => ({
@@ -66,6 +71,20 @@ describe("profile resolution", () => {
       { path: "/skills/a/SKILL.md", enabled: true },
     ], "v1");
     expect(await setup.store.readPending()).toBeUndefined();
+  });
+
+  it("writes explicit project overrides to the project config layer", async () => {
+    const setup = await service();
+    await expect(setup.service.saveProjectConfiguration("/repo", [
+      { path: "/skills/a/SKILL.md", state: "disabled" },
+    ])).resolves.toEqual([
+      { path: "/skills/a/SKILL.md", enabled: false },
+    ]);
+    expect(setup.client.batchWriteSkillsConfig).toHaveBeenCalledWith(
+      [{ path: "/skills/a/SKILL.md", enabled: false }],
+      "project-v1",
+      "/repo/.codex/config.toml",
+    );
   });
 
   it("promotes a prepared transaction when the target was committed", async () => {

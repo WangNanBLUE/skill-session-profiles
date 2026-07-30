@@ -82,6 +82,13 @@ server.registerTool("apply_skill_configuration", {
 }, async ({ cwd, overrides }) =>
   result({ value: await backend.service.applyPersistent(cwd, overrides) }));
 
+server.registerTool("save_project_skill_configuration", {
+  description: "Save skill overrides in the selected project's .codex/config.toml.",
+  inputSchema: { cwd: z.string(), overrides: z.array(skillOverrideSchema) },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
+}, async ({ cwd, overrides }) =>
+  result({ value: await backend.service.saveProjectConfiguration(cwd, overrides) }));
+
 server.registerTool("arm_next_session_profile", {
   description: "Apply a skill overlay to the next qualifying Codex task.",
   inputSchema: {

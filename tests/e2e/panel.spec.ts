@@ -16,7 +16,6 @@ for (const viewport of [
 test("profile editor filters skills by source on mobile", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/tests/e2e/demo.html");
-  await page.getByRole("button", { name: "配置方案" }).click();
   await page.getByRole("button", { name: "编辑 日常开发" }).click();
   await page.getByRole("combobox", { name: "Skill 来源" }).selectOption("system");
   await page.getByRole("textbox", { name: "搜索 skill" }).fill("Code");
@@ -56,4 +55,17 @@ test("workbench fills the window when no state banner is present", async ({ page
   expect(layout.footerBottomGap).toBeLessThanOrEqual(1);
   expect(layout.footerHeight).toBeLessThanOrEqual(60);
   expect(Math.abs(layout.workbenchFooterGap)).toBeLessThanOrEqual(1);
+});
+
+test("project configuration selects from Codex projects", async ({ page }) => {
+  await page.goto("/tests/e2e/demo.html");
+  await page.getByRole("button", { name: "项目配置" }).click();
+  await expect(page.getByRole("button", { name: /Mineradio/ })).toBeVisible();
+  await expect(page.getByRole("combobox", { name: "项目根目录" })).toBeVisible();
+  await page.screenshot({
+    path: "output/project-list.png",
+    animations: "disabled",
+  });
+  await page.getByRole("button", { name: /Mineradio/ }).click();
+  await expect(page.getByRole("heading", { name: "Mineradio" })).toBeVisible();
 });

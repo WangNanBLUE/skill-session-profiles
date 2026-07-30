@@ -6,9 +6,15 @@
 
 [简体中文](README.zh-CN.md)
 
-A macOS app and Codex plugin for managing global skill defaults, reusable
-profiles, and the persistent configuration used by subsequently opened Codex
-tasks.
+A macOS app and Codex plugin for managing global and project-specific skill
+defaults, reusable profiles, and the persistent configuration used by
+subsequently opened Codex tasks.
+
+## Download
+
+Download the latest Apple Silicon build from
+[GitHub Releases](https://github.com/blueroy00/skill-session-profiles/releases/latest).
+The app is currently unsigned and not notarized.
 
 ## Screenshots
 
@@ -16,7 +22,7 @@ tasks.
 
 [![Task configuration](docs/images/task-configuration-en.png)](docs/images/task-configuration-en.png)
 
-### Reusable profile editor
+### Profile editor in Task Configuration
 
 [![Reusable profile editor](docs/images/profile-editor-en.png)](docs/images/profile-editor-en.png)
 
@@ -28,8 +34,12 @@ tasks.
 
 - Browse installed Codex skills and filter them by name or source.
 - Enable or disable all skills in the current filtered result.
-- Save reusable profiles containing explicit per-skill overrides.
-- Apply a profile on top of global defaults for subsequently opened tasks.
+- Select, create, edit, copy, delete, import, and export reusable profiles
+  directly from Task Configuration.
+- Save profiles as reusable templates, then explicitly apply one on top of
+  global defaults for subsequently opened tasks.
+- Save project-specific overrides to the selected project's `.codex/config.toml`.
+- Select local projects in the same order as the Codex project sidebar.
 - Edit global skill defaults through the Codex App Server contract.
 - Switch between Chinese and English, light and dark themes.
 - Share profile data between the standalone app and Codex plugin.
@@ -39,6 +49,15 @@ tasks.
 The standalone Electron app and MCP panel use the same backend and data store.
 Configuration writes go through Codex App Server APIs; the project does not
 edit `~/.codex/config.toml` directly.
+
+Saving a profile only updates the reusable template. Selecting and applying it
+from Task Configuration writes its explicit overrides to the user-level
+configuration; editing the template later does not silently reapply it.
+
+Project configurations contain explicit overrides only. Skills without a
+project override continue to inherit the global default. Explicit project
+settings take precedence and load when a task for that project is opened,
+resumed, or derived.
 
 User data is stored locally at:
 

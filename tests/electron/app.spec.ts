@@ -31,6 +31,11 @@ test("launches a secure, nonblank desktop workbench", async () => {
     await expect(window.getByRole("button", { name: "应用此配置" })).toBeVisible();
     await expect(window.getByRole("button", { name: "Switch to English" })).toBeVisible();
     await expect(window.locator(".skill-row").first()).toBeVisible({ timeout: 20_000 });
+    await window.getByRole("button", { name: "项目配置" }).click();
+    await expect(window.locator(".profile-rail").getByRole("button", {
+      name: /skill-session-profile/,
+    })).toBeVisible();
+    await window.getByRole("button", { name: "任务配置" }).click();
 
     const runtime = await window.evaluate(() => {
       const bounds = (selector: string) =>

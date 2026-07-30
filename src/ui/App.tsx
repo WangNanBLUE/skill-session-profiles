@@ -25,12 +25,13 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState } from 
 import type { PanelApi } from "./api.js";
 import type {
   PendingFile,
+  CodexProject,
   SkillMetadata,
   SkillOverride,
   SkillProfile,
 } from "../shared/contracts.js";
 
-type Tab = "next" | "profiles" | "defaults";
+type Tab = "next" | "project" | "defaults";
 type Language = "zh" | "en";
 type Theme = "light" | "dark";
 type ProfileDraft = {
@@ -41,6 +42,8 @@ type ProfileDraft = {
 type State = {
   skills: SkillMetadata[];
   globalDefaults: Array<{ path: string; enabled: boolean }>;
+  projectConfig: { value: Array<{ path: string; enabled: boolean }>; filePath: string };
+  projects: CodexProject[];
   profiles: SkillProfile[];
   pending: PendingFile | null;
   writable: boolean;
@@ -48,42 +51,44 @@ type State = {
 
 const COPY = {
   zh: {
-    taskConfig: "任务配置", profiles: "配置方案", defaults: "全局默认", functions: "功能",
+    taskConfig: "任务配置", project: "项目配置", codexProjects: "Codex 项目", projectRoots: "项目根目录", profiles: "配置方案", defaults: "全局默认", functions: "功能",
     refresh: "刷新 Skill", closeError: "关闭错误", readOnly: "只读模式。", readOnlyDetail: "当前 Codex App Server 不支持写入 Skill 配置。",
     chooseBase: "选择基础方案", savedCount: "个已保存", inheritGlobal: "继承全局默认", noSavedProfile: "不使用已保存方案",
     defaultBehavior: "默认行为", defaultDetail: "所有新任务首先继承这里的设置。配置方案只保存明确的单项覆盖。",
     totalSkills: "Skill 总数", enabledByDefault: "默认启用", disabledByDefault: "默认停用",
     persistentDetail: "应用后，后续打开的所有 Codex 任务都会沿用此配置。",
+    projectDetail: "仅对此项目生效；未设置项继承全局默认。重新打开或派生的任务会读取此配置。",
     profileDetail: "保存可复用的单项覆盖；未设置项始终继承全局默认。",
     import: "导入", export: "导出", profileName: "方案名称", profilePlaceholder: "例如：代码审查",
     defaultsDetail: "这里的启用状态是所有新任务和配置方案的继承基础。", enabledItems: "项启用",
     filtered: "个筛选结果", unsaved: "有未保存更改", saved: "更改已保存", defaultsSynced: "默认设置已同步",
-    processing: "正在处理…", apply: "应用此配置", saveProfile: "保存方案", saveDefaults: "保存默认设置",
+    processing: "正在处理…", apply: "应用此配置", saveProject: "保存项目配置", saveProfile: "保存方案", saveDefaults: "保存默认设置",
     source: "来源", profileSetting: "方案设置", defaultStatus: "默认状态", setting: "设置",
     inherit: "继承", enabled: "启用", disabled: "停用", noMatch: "没有匹配的 Skill",
     noMatchDetail: "调整名称搜索或来源筛选后重试。", skillSource: "Skill 来源", allSources: "全部来源",
     user: "用户", repo: "仓库", system: "系统", admin: "管理", search: "搜索 Skill 名称",
     searchAria: "搜索 skill", clearSearch: "清空搜索", enableAll: "全部启用", disableAll: "全部禁用",
-    skills: "个 Skill", switchLanguage: "Switch to English", switchTheme: "切换到黑夜模式",
+    skills: "个 Skill", switchLanguage: "Switch to English", switchTheme: "切换到黑夜模式", switchingProject: "正在切换项目…",
   },
   en: {
-    taskConfig: "Task Configuration", profiles: "Profiles", defaults: "Global Defaults", functions: "Features",
+    taskConfig: "Task Configuration", project: "Project Configuration", codexProjects: "Codex Projects", projectRoots: "Project Root", profiles: "Profiles", defaults: "Global Defaults", functions: "Features",
     refresh: "Refresh skills", closeError: "Dismiss error", readOnly: "Read-only mode. ", readOnlyDetail: "This Codex App Server cannot write skill configuration.",
     chooseBase: "Choose base profile", savedCount: "saved", inheritGlobal: "Inherit global defaults", noSavedProfile: "Do not use a saved profile",
     defaultBehavior: "Default behavior", defaultDetail: "New tasks inherit these settings. Profiles store explicit overrides only.",
     totalSkills: "Total skills", enabledByDefault: "Enabled by default", disabledByDefault: "Disabled by default",
     persistentDetail: "After applying, all subsequently opened Codex tasks will use this configuration.",
+    projectDetail: "Applies only to this project. Unset skills inherit global defaults; reopened or derived tasks load it.",
     profileDetail: "Save reusable overrides. Unset skills always inherit global defaults.",
     import: "Import", export: "Export", profileName: "Profile name", profilePlaceholder: "Example: Code review",
     defaultsDetail: "These states are inherited by new tasks and profiles.", enabledItems: "enabled",
     filtered: "filtered", unsaved: "Unsaved changes", saved: "Changes saved", defaultsSynced: "Defaults synced",
-    processing: "Working…", apply: "Apply Configuration", saveProfile: "Save Profile", saveDefaults: "Save Defaults",
+    processing: "Working…", apply: "Apply Configuration", saveProject: "Save Project Configuration", saveProfile: "Save Profile", saveDefaults: "Save Defaults",
     source: "Source", profileSetting: "Profile Setting", defaultStatus: "Default Status", setting: "settings",
     inherit: "Inherit", enabled: "Enabled", disabled: "Disabled", noMatch: "No matching skills",
     noMatchDetail: "Change the name search or source filter and try again.", skillSource: "Skill source", allSources: "All sources",
     user: "User", repo: "Repository", system: "System", admin: "Admin", search: "Search skill names",
     searchAria: "Search skills", clearSearch: "Clear search", enableAll: "Enable All", disableAll: "Disable All",
-    skills: "skills", switchLanguage: "切换到中文", switchTheme: "Switch to dark mode",
+    skills: "skills", switchLanguage: "切换到中文", switchTheme: "Switch to dark mode", switchingProject: "Switching project…",
   },
 };
 type UiCopy = typeof COPY.zh;
@@ -94,6 +99,7 @@ export function App({ api, cwd }: { api: PanelApi; cwd: string }) {
   const [activeCwd, setActiveCwd] = useState(cwd);
   const [tab, setTab] = useState<Tab>("next");
   const [state, setState] = useState<State | null>(null);
+  const [loadingCwd, setLoadingCwd] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [scopeFilter, setScopeFilter] = useState("all");
   const [error, setError] = useState("");
@@ -101,6 +107,7 @@ export function App({ api, cwd }: { api: PanelApi; cwd: string }) {
   const [busy, setBusy] = useState(false);
   const [nextProfileId, setNextProfileId] = useState<string | null>(null);
   const [nextOverrides, setNextOverrides] = useState<SkillOverride[]>([]);
+  const [projectOverrides, setProjectOverrides] = useState<SkillOverride[]>([]);
   const [profileDraft, setProfileDraft] = useState<ProfileDraft | null>(null);
   const [defaultValues, setDefaultValues] = useState<Record<string, boolean>>({});
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
@@ -118,7 +125,7 @@ export function App({ api, cwd }: { api: PanelApi; cwd: string }) {
 
   useEffect(() => {
     let active = true;
-    setState(null);
+    setLoadingCwd(activeCwd);
     void api.call("get_skill_profile_state", { cwd: activeCwd })
       .then((value) => {
         if (!active) return;
@@ -127,6 +134,9 @@ export function App({ api, cwd }: { api: PanelApi; cwd: string }) {
       })
       .catch((reason) => {
         if (active) setError(friendlyError(reason));
+      })
+      .finally(() => {
+        if (active) setLoadingCwd(null);
       });
     return () => {
       active = false;
@@ -141,6 +151,10 @@ export function App({ api, cwd }: { api: PanelApi; cwd: string }) {
         state.globalDefaults.find((item) => item.path === skill.path)?.enabled ?? skill.enabled,
       ]),
     ));
+    setProjectOverrides(state.projectConfig.value.map((entry) => ({
+      path: entry.path,
+      state: entry.enabled ? "enabled" : "disabled",
+    })));
   }, [state]);
 
   useEffect(() => {
@@ -176,6 +190,8 @@ export function App({ api, cwd }: { api: PanelApi; cwd: string }) {
   );
 
   const selectedNextProfile = state?.profiles.find((item) => item.id === nextProfileId);
+  const selectedProject = state?.projects.find((project) =>
+    project.rootPaths.some((root) => activeCwd === root || activeCwd.startsWith(`${root}/`)));
   const selectedSavedProfile = profileDraft?.id
     ? state?.profiles.find((item) => item.id === profileDraft.id)
     : undefined;
@@ -188,6 +204,12 @@ export function App({ api, cwd }: { api: PanelApi; cwd: string }) {
     return defaultValues[skill.path] !== initial;
   });
   const currentNextOverrides = currentOverrides(nextOverrides, inventoryPaths);
+  const currentProjectOverrides = currentOverrides(projectOverrides, inventoryPaths);
+  const projectDirty = state !== null
+    && overridesKey(projectOverrides) !== overridesKey(state.projectConfig.value.map((entry) => ({
+      path: entry.path,
+      state: entry.enabled ? "enabled" : "disabled",
+    })));
   const nextStaleCount = nextOverrides.length - currentNextOverrides.length;
   const currentDraftOverrides = currentOverrides(profileDraft?.overrides ?? [], inventoryPaths);
   const draftStaleCount = (profileDraft?.overrides.length ?? 0) - currentDraftOverrides.length;
@@ -219,6 +241,7 @@ export function App({ api, cwd }: { api: PanelApi; cwd: string }) {
       setActiveCwd(nextCwd);
       setNextProfileId(null);
       setNextOverrides([]);
+      setProjectOverrides([]);
       setProfileDraft(null);
       setQuery("");
     }
@@ -260,6 +283,8 @@ export function App({ api, cwd }: { api: PanelApi; cwd: string }) {
   if (state === null && !error) {
     return <LoadingShell language={language} />;
   }
+
+  const switchingProject = state !== null && loadingCwd !== null;
 
   return <LanguageContext.Provider value={language}><main className="desktop-shell">
     <header className="command-bar">
@@ -334,46 +359,25 @@ export function App({ api, cwd }: { api: PanelApi; cwd: string }) {
             <CircleCheck size={17} /><span>{copy.taskConfig}</span>
             {state?.pending && <span className="nav-count">1</span>}
           </button>
-          <button aria-label={copy.profiles} aria-current={tab === "profiles" ? "page" : undefined} className={tab === "profiles" ? "active" : ""} onClick={() => setTab("profiles")}>
-            <Layers3 size={17} /><span>{copy.profiles}</span>
-            <span className="nav-count">{state?.profiles.length ?? 0}</span>
+          <button aria-label={copy.project} aria-current={tab === "project" ? "page" : undefined} className={tab === "project" ? "active" : ""} onClick={() => setTab("project")}>
+            <FolderOpen size={17} /><span>{copy.project}</span>
+            <span className="nav-count">{state?.projectConfig.value.length ?? 0}</span>
           </button>
           <button aria-label={copy.defaults} aria-current={tab === "defaults" ? "page" : undefined} className={tab === "defaults" ? "active" : ""} onClick={() => setTab("defaults")}>
             <Globe2 size={17} /><span>{copy.defaults}</span>
           </button>
         </nav>
 
-        {tab === "next" && <div className="sidebar-section">
-          <div className="sidebar-heading">
-            <span>{copy.chooseBase}</span>
-            <small>{state?.profiles.length ?? 0} {copy.savedCount}</small>
-          </div>
-          <div className="profile-rail">
-            <button
-              className={nextProfileId === null ? "profile-item selected" : "profile-item"}
-              onClick={() => selectNextProfile(null)}
-            >
-              <span className="profile-symbol"><Globe2 size={16} /></span>
-              <span><strong>{copy.inheritGlobal}</strong><small>{copy.noSavedProfile}</small></span>
-              {nextProfileId === null && <Check size={16} />}
-            </button>
-            {state?.profiles.map((profile) => <button
-              key={profile.id}
-              className={nextProfileId === profile.id ? "profile-item selected" : "profile-item"}
-              onClick={() => selectNextProfile(profile)}
-            >
-              <span className="profile-symbol"><SlidersHorizontal size={16} /></span>
-              <span><strong>{profile.name}</strong><small>{overrideSummary(profile.overrides, inventoryPaths, true, language)}</small></span>
-              {nextProfileId === profile.id && <Check size={16} />}
-            </button>)}
-          </div>
-        </div>}
-
-        {tab === "profiles" && <ProfilesRail
+        {tab === "next" && <ProfilesRail
           profiles={state?.profiles ?? []}
           inventoryPaths={inventoryPaths}
+          selectedId={nextProfileId}
           draft={profileDraft}
           deleteConfirmId={deleteConfirmId}
+          onChoose={(profile) => {
+            selectNextProfile(profile);
+            setProfileDraft(null);
+          }}
           onCreate={() => {
             setProfileDraft({ name: "", overrides: [] });
             setDeleteConfirmId(null);
@@ -385,6 +389,7 @@ export function App({ api, cwd }: { api: PanelApi; cwd: string }) {
           })}
           onRequestDelete={setDeleteConfirmId}
           onDelete={(profile) => void run("delete_skill_profile", { id: profile.id }, () => {
+            if (nextProfileId === profile.id) selectNextProfile(null);
             if (profileDraft?.id === profile.id) setProfileDraft(null);
             setDeleteConfirmId(null);
           })}
@@ -400,14 +405,30 @@ export function App({ api, cwd }: { api: PanelApi; cwd: string }) {
           </dl>
         </div>}
 
+        {tab === "project" && <ProjectRail
+          projects={state?.projects ?? []}
+          activeCwd={activeCwd}
+          onSelect={(project) => {
+            if (projectDirty && !window.confirm(language === "zh"
+              ? "当前项目配置尚未保存，确定切换项目吗？"
+              : "The current project configuration is unsaved. Switch projects?")) return;
+            setActiveCwd(project.rootPaths[0]);
+          }}
+        />}
+
         <div className="scope-path" title={activeCwd}>
           <FolderOpen size={14} />
           <span>{activeCwd}</span>
         </div>
       </aside>
 
-      <section className="content-pane">
-        {tab === "next" && <>
+      <section
+        className="content-pane"
+        aria-busy={switchingProject}
+        inert={switchingProject ? true : undefined}
+      >
+        {switchingProject && <div className="project-switch-progress" role="progressbar" aria-label={copy.switchingProject} />}
+        {tab === "next" && !profileDraft && <>
           <PaneHeader
             title={selectedNextProfile?.name ?? copy.inheritGlobal}
             description={copy.persistentDetail}
@@ -415,26 +436,6 @@ export function App({ api, cwd }: { api: PanelApi; cwd: string }) {
             countLabel={language === "zh"
               ? `项当前覆盖${nextStaleCount > 0 ? ` · ${nextStaleCount} 项失效` : ""}`
               : `current overrides${nextStaleCount > 0 ? ` · ${nextStaleCount} stale` : ""}`}
-          />
-          <SkillWorkbench
-            skills={displayedSkills}
-            total={state?.skills.length ?? 0}
-            query={query}
-            setQuery={setQuery}
-            searchRef={searchRef}
-            scopeFilter={scopeFilter}
-            setScopeFilter={setScopeFilter}
-            overrides={nextOverrides}
-            setOverride={(path, value) => setNextOverrides((current) => updateOverride(current, path, value))}
-            setAll={(value) => setNextOverrides((current) =>
-              applyVisibleOverrides(current, displayedSkills, value))}
-          />
-        </>}
-
-        {tab === "profiles" && <>
-          <PaneHeader
-            title={profileDraft?.id ? profileDraft.name : profileDraft ? (language === "zh" ? "新建配置方案" : "New Profile") : copy.profiles}
-            description={copy.profileDetail}
             actions={<>
               <label className="secondary-button file-button" role="button" tabIndex={0}>
                 <Upload size={16} />{copy.import}
@@ -454,8 +455,30 @@ export function App({ api, cwd }: { api: PanelApi; cwd: string }) {
               </button>
             </>}
           />
-          {profileDraft
-            ? <div className="profile-editor">
+          <SkillWorkbench
+            skills={displayedSkills}
+            total={state?.skills.length ?? 0}
+            query={query}
+            setQuery={setQuery}
+            searchRef={searchRef}
+            scopeFilter={scopeFilter}
+            setScopeFilter={setScopeFilter}
+            overrides={nextOverrides}
+            setOverride={(path, value) => setNextOverrides((current) => updateOverride(current, path, value))}
+            setAll={(value) => setNextOverrides((current) =>
+              applyVisibleOverrides(current, displayedSkills, value))}
+          />
+        </>}
+
+        {tab === "next" && profileDraft && <>
+          <PaneHeader
+            title={profileDraft.id ? profileDraft.name : (language === "zh" ? "新建配置方案" : "New Profile")}
+            description={copy.profileDetail}
+            actions={<button type="button" className="secondary-button" onClick={() => setProfileDraft(null)}>
+              <X size={16} />{language === "zh" ? "取消编辑" : "Cancel Editing"}
+            </button>}
+          />
+          <div className="profile-editor">
                 <label className="name-field">
                   <span>{copy.profileName}</span>
                   <input
@@ -500,8 +523,43 @@ export function App({ api, cwd }: { api: PanelApi; cwd: string }) {
                     overrides: applyVisibleOverrides(profileDraft.overrides, displayedSkills, value),
                   })}
                 />
-              </div>
-            : <EmptyEditor onCreate={() => setProfileDraft({ name: "", overrides: [] })} />}
+          </div>
+        </>}
+
+        {tab === "project" && <>
+          <PaneHeader
+            title={selectedProject?.name ?? lastPathPart(activeCwd)}
+            description={copy.projectDetail}
+            count={currentProjectOverrides.length}
+            countLabel={language === "zh" ? "项项目覆盖" : "project overrides"}
+            actions={selectedProject && selectedProject.rootPaths.length > 1
+              ? <label className="project-root-select">
+                  <span>{copy.projectRoots}</span>
+                  <select
+                    aria-label={copy.projectRoots}
+                    value={selectedProject.rootPaths.find((root) =>
+                      activeCwd === root || activeCwd.startsWith(`${root}/`)) ?? selectedProject.rootPaths[0]}
+                    onChange={(event) => setActiveCwd(event.target.value)}
+                  >
+                    {selectedProject.rootPaths.map((root) =>
+                      <option key={root} value={root}>{lastPathPart(root)}</option>)}
+                  </select>
+                </label>
+              : undefined}
+          />
+          <SkillWorkbench
+            skills={displayedSkills}
+            total={state?.skills.length ?? 0}
+            query={query}
+            setQuery={setQuery}
+            searchRef={searchRef}
+            scopeFilter={scopeFilter}
+            setScopeFilter={setScopeFilter}
+            overrides={projectOverrides}
+            setOverride={(path, value) => setProjectOverrides((current) => updateOverride(current, path, value))}
+            setAll={(value) => setProjectOverrides((current) =>
+              applyVisibleOverrides(current, displayedSkills, value))}
+          />
         </>}
 
         {tab === "defaults" && <>
@@ -532,15 +590,20 @@ export function App({ api, cwd }: { api: PanelApi; cwd: string }) {
 
     <footer className="status-bar" aria-live="polite">
       <div>
+        {switchingProject && <>
+          <span>{copy.switchingProject}</span>
+          <span className="status-separator">·</span>
+        </>}
         <span>{displayedSkills.length} {copy.filtered}</span>
         <span className="status-separator">·</span>
         {tab === "next" && <span>{overrideSummary(nextOverrides, inventoryPaths, false, language)}</span>}
-        {tab === "profiles" && <span>{profileDirty ? copy.unsaved : copy.saved}</span>}
+        {tab === "next" && profileDraft && <span>{profileDirty ? copy.unsaved : copy.saved}</span>}
+        {tab === "project" && <span>{projectDirty ? copy.unsaved : copy.saved}</span>}
         {tab === "defaults" && <span>{defaultsDirty ? copy.unsaved : copy.defaultsSynced}</span>}
       </div>
       <div className="status-actions">
         {busy && <span className="saving-label">{copy.processing}</span>}
-        {tab === "next" && <button
+        {tab === "next" && !profileDraft && <button
           type="button"
           className="primary-button"
           disabled={busy || Boolean(state?.pending) || state?.writable === false}
@@ -553,7 +616,7 @@ export function App({ api, cwd }: { api: PanelApi; cwd: string }) {
               : "Configuration applied. All subsequently opened tasks will use it.");
           })}
         ><CircleCheck size={16} />{copy.apply}</button>}
-        {tab === "profiles" && <button
+        {tab === "next" && profileDraft && <button
           type="button"
           className="primary-button"
           disabled={busy || !profileDraft?.name.trim() || !profileDirty}
@@ -563,9 +626,23 @@ export function App({ api, cwd }: { api: PanelApi; cwd: string }) {
             overrides: profileDraft.overrides,
           }, (result) => {
             const saved = result.profile as SkillProfile;
-            setProfileDraft({ id: saved.id, name: saved.name, overrides: saved.overrides });
+            selectNextProfile(saved);
+            setProfileDraft(null);
           })}
         ><Check size={16} />{copy.saveProfile}</button>}
+        {tab === "project" && <button
+          type="button"
+          className="primary-button"
+          disabled={busy || !projectDirty || Boolean(state?.pending) || state?.writable === false}
+          onClick={() => void run("save_project_skill_configuration", {
+            cwd: activeCwd,
+            overrides: currentProjectOverrides,
+          }, () => {
+            setSuccess(language === "zh"
+              ? "项目配置已保存。重新打开或派生的此项目任务会使用它。"
+              : "Project configuration saved. Reopened or derived tasks for this project will use it.");
+          })}
+        ><Check size={16} />{copy.saveProject}</button>}
         {tab === "defaults" && <button
           type="button"
           className="primary-button"
@@ -605,11 +682,53 @@ function PendingBanner({ pending, busy, writable, onResolve }: {
   </div>;
 }
 
-function ProfilesRail({ profiles, inventoryPaths, draft, deleteConfirmId, onCreate, onSelect, onCopy, onRequestDelete, onDelete }: {
+function ProjectRail({ projects, activeCwd, onSelect }: {
+  projects: CodexProject[];
+  activeCwd: string;
+  onSelect(project: CodexProject): void;
+}) {
+  const copy = useCopy();
+  const english = useContext(LanguageContext) === "en";
+  return <div className="sidebar-section">
+    <div className="sidebar-heading">
+      <span>{copy.codexProjects}</span>
+      <small>{projects.length}</small>
+    </div>
+    <div className="profile-rail">
+      {projects.map((project) => {
+        const selected = project.rootPaths.some((root) =>
+          activeCwd === root || activeCwd.startsWith(`${root}/`));
+        return <button
+          type="button"
+          key={project.id}
+          className={selected ? "profile-item selected" : "profile-item"}
+          onClick={() => onSelect(project)}
+          title={project.rootPaths.join("\n")}
+        >
+          <span className="profile-symbol"><FolderOpen size={16} /></span>
+          <span>
+            <strong>{project.name}</strong>
+            <small>{project.rootPaths.length === 1
+              ? project.rootPaths[0]
+              : english ? `${project.rootPaths.length} workspace roots` : `${project.rootPaths.length} 个工作区根目录`}</small>
+          </span>
+          {selected && <Check size={16} />}
+        </button>;
+      })}
+      {projects.length === 0 && <div className="rail-empty">
+        {english ? "No local Codex projects" : "没有本地 Codex 项目"}
+      </div>}
+    </div>
+  </div>;
+}
+
+function ProfilesRail({ profiles, inventoryPaths, selectedId, draft, deleteConfirmId, onChoose, onCreate, onSelect, onCopy, onRequestDelete, onDelete }: {
   profiles: SkillProfile[];
   inventoryPaths: ReadonlySet<string>;
+  selectedId: string | null;
   draft: ProfileDraft | null;
   deleteConfirmId: string | null;
+  onChoose(profile: SkillProfile | null): void;
   onCreate(): void;
   onSelect(profile: SkillProfile): void;
   onCopy(profile: SkillProfile): void;
@@ -619,17 +738,26 @@ function ProfilesRail({ profiles, inventoryPaths, draft, deleteConfirmId, onCrea
   const english = useContext(LanguageContext) === "en";
   return <div className="sidebar-section profiles-section">
     <div className="sidebar-heading">
-      <span>{english ? "Saved Profiles" : "已保存方案"}</span>
+      <span>{english ? "Task Profiles" : "任务配置方案"}</span>
       <button type="button" className="icon-button compact" title={english ? "New Profile" : "新建方案"} aria-label={english ? "New Profile" : "新建方案"} onClick={onCreate}>
         <Plus size={16} />
       </button>
     </div>
     <div className="profile-rail">
+      <button
+        type="button"
+        className={selectedId === null && draft === null ? "profile-item selected" : "profile-item"}
+        onClick={() => onChoose(null)}
+      >
+        <span className="profile-symbol"><Globe2 size={16} /></span>
+        <span><strong>{english ? "Inherit global defaults" : "继承全局默认"}</strong><small>{english ? "No saved profile" : "不使用已保存方案"}</small></span>
+        {selectedId === null && draft === null && <Check size={16} />}
+      </button>
       {profiles.map((profile) => <div
         key={profile.id}
-        className={draft?.id === profile.id ? "profile-row selected" : "profile-row"}
+        className={draft?.id === profile.id || (draft === null && selectedId === profile.id) ? "profile-row selected" : "profile-row"}
       >
-        <button className="profile-main" onClick={() => onSelect(profile)}>
+        <button className="profile-main" onClick={() => onChoose(profile)}>
           <span className="profile-symbol"><SlidersHorizontal size={16} /></span>
           <span><strong>{profile.name}</strong><small>{overrideSummary(profile.overrides, inventoryPaths, true, english ? "en" : "zh")}</small></span>
         </button>
@@ -831,16 +959,6 @@ function FilterBar({ query, setQuery, searchRef, scopeFilter, setScopeFilter, vi
         <CircleX size={15} />{copy.disableAll}{english ? ` (${visibleCount})` : `（${visibleCount}）`}
       </button>
     </div>
-  </div>;
-}
-
-function EmptyEditor({ onCreate }: { onCreate(): void }) {
-  const english = useContext(LanguageContext) === "en";
-  return <div className="editor-empty">
-    <Layers3 size={24} />
-    <h2>{english ? "Choose a Profile" : "选择一个配置方案"}</h2>
-    <p>{english ? "Choose a saved profile from the sidebar, or create a reusable set of skill overrides." : "从左侧选择已有方案，或新建一个可复用的 Skill 覆盖组合。"}</p>
-    <button type="button" className="primary-button" onClick={onCreate}><Plus size={16} />{english ? "New Profile" : "新建方案"}</button>
   </div>;
 }
 

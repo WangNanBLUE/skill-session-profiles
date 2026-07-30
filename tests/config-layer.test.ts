@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { extractUserSkillLayer } from "../src/server/config-layer.js";
+import { extractProjectSkillLayer, extractUserSkillLayer } from "../src/server/config-layer.js";
 import type { ConfigReadResponse } from "../src/shared/contracts.js";
 
 describe("extractUserSkillLayer", () => {
@@ -17,5 +17,26 @@ describe("extractUserSkillLayer", () => {
       version: "user-v1",
       value: [{ path: "/user", enabled: true }],
     });
+  });
+});
+
+it("resolves the nearest project skill layer or the selected project path", () => {
+  const response: ConfigReadResponse = {
+    config: {}, origins: {},
+    layers: [{
+      name: { type: "project", dotCodexFolder: "/repo/.codex" },
+      version: "project-v1",
+      config: { skills: { config: [{ path: "/project", enabled: false }] } },
+    }],
+  };
+  expect(extractProjectSkillLayer(response, "/repo/packages/app")).toEqual({
+    version: "project-v1",
+    value: [{ path: "/project", enabled: false }],
+    filePath: "/repo/.codex/config.toml",
+  });
+  expect(extractProjectSkillLayer({ ...response, layers: [] }, "/new-repo")).toEqual({
+    version: null,
+    value: [],
+    filePath: "/new-repo/.codex/config.toml",
   });
 });

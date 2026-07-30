@@ -15,6 +15,14 @@ const state = {
     { path: "/skills/deploy/SKILL.md", enabled: true },
     { path: "/skills/report/SKILL.md", enabled: false },
   ],
+  projectConfig: {
+    value: [{ path: "/skills/report/SKILL.md", enabled: true }],
+    filePath: "/repo/.codex/config.toml",
+  },
+  projects: [
+    { id: "project-1", name: "Current", rootPaths: ["/repo", "/repo-site"] },
+    { id: "project-2", name: "Mineradio", rootPaths: ["/projects/Mineradio"] },
+  ],
   profiles: [{
     id: "p1", name: "Daily", overrides: [
       { path: "/skills/deploy/SKILL.md", state: "enabled" },
@@ -85,7 +93,7 @@ describe("Skill Session Profiles panel", () => {
     const api = createApi();
     render(<App api={api} cwd="/repo" />);
     await screen.findByText("Skill Session Profiles");
-    await userEvent.click(screen.getByRole("button", { name: "配置方案" }));
+    expect(screen.queryByRole("button", { name: "配置方案" })).toBeNull();
     expect(screen.getByRole("button", { name: "编辑 Daily" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "复制 Daily" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "导入" })).toBeTruthy();
@@ -112,7 +120,6 @@ describe("Skill Session Profiles panel", () => {
     const api = createApi();
     render(<App api={api} cwd="/repo" />);
     await screen.findByText("Skill Session Profiles");
-    await userEvent.click(screen.getByRole("button", { name: "配置方案" }));
     await userEvent.click(screen.getByRole("button", { name: "编辑 Daily" }));
     await userEvent.selectOptions(
       screen.getByRole("combobox", { name: "Skill 来源" }),
@@ -151,11 +158,68 @@ describe("Skill Session Profiles panel", () => {
     expect(screen.getByText("配置已应用。后续打开的所有任务都会沿用此配置。")).toBeTruthy();
   });
 
+  it("saves overrides for the selected project", async () => {
+    const api = createApi();
+    render(<App api={api} cwd="/repo" />);
+    await screen.findByText("Skill Session Profiles");
+    await userEvent.click(screen.getByRole("button", { name: "项目配置" }));
+    const reportSetting = screen.getByRole("group", { name: "Report 设置" });
+    await userEvent.click(reportSetting.querySelectorAll("input")[2]!);
+    await userEvent.click(screen.getByRole("button", { name: "保存项目配置" }));
+
+    expect(api.call).toHaveBeenCalledWith("save_project_skill_configuration", {
+      cwd: "/repo",
+      overrides: [{ path: "/skills/report/SKILL.md", state: "disabled" }],
+    });
+  });
+
+  it("selects a project from the Codex project list", async () => {
+    const api = createApi();
+    render(<App api={api} cwd="/repo" />);
+    await screen.findByText("Skill Session Profiles");
+    await userEvent.click(screen.getByRole("button", { name: "项目配置" }));
+    expect(screen.getByRole("button", { name: /Mineradio/ })).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: /Mineradio/ }));
+    expect(api.call).toHaveBeenCalledWith("get_skill_profile_state", {
+      cwd: "/projects/Mineradio",
+    });
+  });
+
+  it("keeps the current project visible while another project loads", async () => {
+    let resolveProject!: (value: typeof state) => void;
+    const projectState = new Promise<typeof state>((resolve) => {
+      resolveProject = resolve;
+    });
+    const api = createApi();
+    api.call.mockImplementation(async (name: string, args: Record<string, unknown>) => {
+      if (name === "get_skill_profile_state" && args.cwd === "/projects/Mineradio") {
+        return projectState;
+      }
+      if (name === "get_skill_profile_state") return state;
+      return {};
+    });
+
+    render(<App api={api} cwd="/repo" />);
+    await screen.findByText("Skill Session Profiles");
+    await userEvent.click(screen.getByRole("button", { name: "项目配置" }));
+    expect(screen.getByText("Report", { exact: true })).toBeTruthy();
+
+    await userEvent.click(screen.getByRole("button", { name: /Mineradio/ }));
+
+    expect(screen.getByText("Report", { exact: true })).toBeTruthy();
+    expect(screen.queryByText("正在读取 Skill 配置…")).toBeNull();
+    expect(screen.getByRole("progressbar", { name: "正在切换项目…" })).toBeTruthy();
+    expect(screen.getByText("正在切换项目…")).toBeTruthy();
+
+    resolveProject({ ...state, projectConfig: { ...state.projectConfig, value: [] } });
+    expect(await screen.findByText("更改已保存")).toBeTruthy();
+    expect(screen.queryByRole("progressbar")).toBeNull();
+  });
+
   it("cleans stale profile overrides only when the edited profile is saved", async () => {
     const api = createApi();
     render(<App api={api} cwd="/repo" />);
     await screen.findByText("Skill Session Profiles");
-    await userEvent.click(screen.getByRole("button", { name: "配置方案" }));
     await userEvent.click(screen.getByRole("button", { name: "编辑 Daily" }));
 
     expect(screen.getByText("1 项覆盖已不在当前 Skill 列表中。")).toBeTruthy();

@@ -343,6 +343,33 @@ describe("AppServerClient", () => {
     await client.close();
   });
 
+  it("targets a project config file when requested", async () => {
+    const { client, transport } = await createInitializedClient();
+    const pending = client.batchWriteSkillsConfig(
+      [{ path: "/skills/one", enabled: false }],
+      "project-v1",
+      "/repo/.codex/config.toml",
+    );
+    await vi.waitFor(() => expect(transport.messages()).toHaveLength(3));
+    expect(transport.messages()[2]).toMatchObject({
+      method: "config/batchWrite",
+      params: {
+        filePath: "/repo/.codex/config.toml",
+        expectedVersion: "project-v1",
+        reloadUserConfig: false,
+      },
+    });
+    transport.emitLine({
+      id: transport.messages()[2].id,
+      result: {
+        status: "ok", version: "project-v2",
+        filePath: "/repo/.codex/config.toml", overriddenMetadata: null,
+      },
+    });
+    await pending;
+    await client.close();
+  });
+
   it.each([
     [-32600, true],
     [-32602, true],
