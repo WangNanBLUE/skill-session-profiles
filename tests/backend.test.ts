@@ -24,6 +24,23 @@ it("rejects renderer calls outside the explicit backend allowlist", async () => 
   await expect(backend.call("run_arbitrary_command", {})).rejects.toThrow();
 });
 
+it("accepts Windows absolute working directories", async () => {
+  const backend = new SkillProfileBackend(
+    {} as AppServerClient,
+    new JsonStore("/unused"),
+  );
+  const state = vi.spyOn(backend, "state").mockResolvedValue({} as never);
+
+  await expect(backend.call("get_skill_profile_state", {
+    cwd: "C:\\Users\\blue\\project",
+  })).resolves.toEqual({});
+  expect(state).toHaveBeenCalledWith("C:\\Users\\blue\\project");
+
+  await expect(backend.call("get_skill_profile_state", {
+    cwd: "relative\\project",
+  })).rejects.toThrow();
+});
+
 it("keeps project-only MCP servers out of global configuration", async () => {
   const globalConfig = {
     config: {

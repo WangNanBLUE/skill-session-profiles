@@ -9,12 +9,17 @@ const execFileAsync = promisify(execFile);
 
 export async function resolveCodexCommand(
   platform: NodeJS.Platform = process.platform,
+  architecture: NodeJS.Architecture = process.arch,
 ): Promise<string> {
   const home = homedir();
   const configured = process.env.CODEX_BINARY ?? process.env.CODEX_BIN;
+  const platformSpecificCandidates = platform === "win32"
+    ? await windowsCodexCandidates(home, architecture)
+    : [];
   const candidates = [
     configured,
     ...pathCandidates(process.env.PATH, platform),
+    ...platformSpecificCandidates,
     "/opt/homebrew/bin/codex",
     "/usr/local/bin/codex",
     "/Applications/ChatGPT.app/Contents/Resources/codex",
@@ -51,6 +56,73 @@ export async function resolveCodexCommand(
   throw new Error(
     "找不到 Codex CLI。请先安装 Codex，或设置 CODEX_BINARY 为 codex 可执行文件的绝对路径。",
   );
+}
+
+async function windowsCodexCandidates(
+  home: string,
+  architecture: NodeJS.Architecture,
+): Promise<string[]> {
+  const roamingAppData = process.env.APPDATA
+    ?? win32.join(home, "AppData", "Roaming");
+  const localAppData = process.env.LOCALAPPDATA
+    ?? win32.join(home, "AppData", "Local");
+  const npmPrefixes = [
+    process.env.NPM_CONFIG_PREFIX,
+    win32.join(roamingAppData, "npm"),
+  ].filter((value): value is string => Boolean(value));
+  const desktopCacheRoot = win32.join(localAppData, "OpenAI", "Codex", "bin");
+
+  return [
+    ...npmPrefixes.flatMap((prefix) => npmCodexCandidates(prefix, architecture)),
+    ...await versionedWindowsCandidates(desktopCacheRoot),
+    win32.join(localAppData, "Programs", "Codex", "codex.exe"),
+  ];
+}
+
+function npmCodexCandidates(
+  prefix: string,
+  architecture: NodeJS.Architecture,
+): string[] {
+  const architectureNames = architecture === "x64"
+    ? { package: "x64", target: "x86_64" }
+    : architecture === "arm64"
+    ? { package: "arm64", target: "aarch64" }
+    : undefined;
+  const nativeBinary = architectureNames === undefined
+    ? []
+    : [win32.join(
+        prefix,
+        "node_modules",
+        "@openai",
+        "codex",
+        "node_modules",
+        "@openai",
+        `codex-win32-${architectureNames.package}`,
+        "vendor",
+        `${architectureNames.target}-pc-windows-msvc`,
+        "bin",
+        "codex.exe",
+      )];
+
+  return [
+    ...nativeBinary,
+    win32.join(prefix, "codex.exe"),
+    win32.join(prefix, "codex.cmd"),
+    win32.join(prefix, "codex"),
+  ];
+}
+
+async function versionedWindowsCandidates(root: string): Promise<string[]> {
+  try {
+    return (await readdir(root, { withFileTypes: true }))
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => win32.join(root, entry.name, "codex.exe"))
+      .sort((a, b) => b.localeCompare(a));
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === "ENOENT" || code === "EACCES") return [];
+    throw error;
+  }
 }
 
 function pathCandidates(

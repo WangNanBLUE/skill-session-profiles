@@ -4,15 +4,30 @@ import { join } from "node:path";
 
 import { expect, it } from "vitest";
 
-import { AppServerClient } from "../../src/server/app-server-client.js";
+import {
+  AppServerClient,
+  CodexAppServerLineTransport,
+} from "../../src/server/app-server-client.js";
+import { resolveCodexCommand } from "../../src/electron/codex-command.js";
 import { JsonStore } from "../../src/server/json-store.js";
 import { ProfileService } from "../../src/server/profile-service.js";
+
+function removeTemporaryDirectory(path: string): Promise<void> {
+  return rm(path, {
+    recursive: true,
+    force: true,
+    maxRetries: 10,
+    retryDelay: 100,
+  });
+}
 
 it("reads Codex state without an app-server control socket", async () => {
   const codexHome = await mkdtemp(join(tmpdir(), "skill-profiles-codex-home-"));
   const previousCodexHome = process.env.CODEX_HOME;
   process.env.CODEX_HOME = codexHome;
-  const client = new AppServerClient();
+  const client = new AppServerClient(
+    new CodexAppServerLineTransport(await resolveCodexCommand()),
+  );
 
   try {
     const [skills, config] = await Promise.all([
@@ -28,7 +43,7 @@ it("reads Codex state without an app-server control socket", async () => {
     } else {
       process.env.CODEX_HOME = previousCodexHome;
     }
-    await rm(codexHome, { recursive: true, force: true });
+    await removeTemporaryDirectory(codexHome);
   }
 });
 
@@ -44,7 +59,9 @@ it("saves project skill policy to AGENTS.md through the real app-server filesyst
   );
   const agentsFile = join(projectRoot, "AGENTS.md");
   await writeFile(agentsFile, "# Preserve this guidance\n");
-  const client = new AppServerClient();
+  const client = new AppServerClient(
+    new CodexAppServerLineTransport(await resolveCodexCommand()),
+  );
   const service = new ProfileService(client, new JsonStore(dataRoot));
 
   try {
@@ -68,9 +85,9 @@ it("saves project skill policy to AGENTS.md through the real app-server filesyst
       process.env.CODEX_HOME = previousCodexHome;
     }
     await Promise.all([
-      rm(projectRoot, { recursive: true, force: true }),
-      rm(dataRoot, { recursive: true, force: true }),
-      rm(codexHome, { recursive: true, force: true }),
+      removeTemporaryDirectory(projectRoot),
+      removeTemporaryDirectory(dataRoot),
+      removeTemporaryDirectory(codexHome),
     ]);
   }
 });
@@ -79,7 +96,22 @@ it("disables a skill when user config uses its full SKILL.md path", async () => 
   const codexHome = await mkdtemp(join(tmpdir(), "skill-profiles-codex-home-"));
   const previousCodexHome = process.env.CODEX_HOME;
   process.env.CODEX_HOME = codexHome;
-  let client = new AppServerClient();
+  const userSkillDirectory = join(codexHome, "skills", "integration-skill");
+  await mkdir(userSkillDirectory, { recursive: true });
+  await writeFile(
+    join(userSkillDirectory, "SKILL.md"),
+    [
+      "---",
+      "name: integration-skill",
+      "description: Integration test skill.",
+      "---",
+      "",
+      "# Integration skill",
+      "",
+    ].join("\n"),
+  );
+  const codexCommand = await resolveCodexCommand();
+  let client = new AppServerClient(new CodexAppServerLineTransport(codexCommand));
 
   try {
     const inventory = await client.listSkills([process.cwd()], true);
@@ -93,7 +125,7 @@ it("disables a skill when user config uses its full SKILL.md path", async () => 
       join(codexHome, "config.toml"),
       `[[skills.config]]\npath = ${JSON.stringify(skillPath)}\nenabled = false\n`,
     );
-    client = new AppServerClient();
+    client = new AppServerClient(new CodexAppServerLineTransport(codexCommand));
     const updatedInventory = await client.listSkills([process.cwd()], true);
     expect(updatedInventory.data[0]?.skills.find(
       (skill) => skill.path === skillPath,
@@ -105,6 +137,6 @@ it("disables a skill when user config uses its full SKILL.md path", async () => 
     } else {
       process.env.CODEX_HOME = previousCodexHome;
     }
-    await rm(codexHome, { recursive: true, force: true });
+    await removeTemporaryDirectory(codexHome);
   }
 });

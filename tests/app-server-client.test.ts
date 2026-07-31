@@ -12,6 +12,7 @@ describe("codexAppServerInvocation", () => {
       .toEqual({
         command: "cmd.exe",
         args: ["/d", "/s", "/c", '"C:\\npm\\codex.cmd" app-server --stdio'],
+        windowsVerbatimArguments: true,
       });
   });
 
