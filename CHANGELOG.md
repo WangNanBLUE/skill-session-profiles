@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] - 2026-07-31
+
+### Added
+
+- Add Windows x64 directory and NSIS installer packaging commands.
+- Build and publish Windows installers from tagged GitHub releases.
+- Discover and launch Windows Codex CLI executables and npm command shims.
+
 ## [0.3.0] - 2026-07-31
 
 ### Added

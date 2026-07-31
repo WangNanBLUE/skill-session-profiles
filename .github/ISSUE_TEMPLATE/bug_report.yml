@@ -30,10 +30,10 @@ body:
     validations:
       required: true
   - type: input
-    id: macos
+    id: platform
     attributes:
-      label: macOS and hardware
-      placeholder: macOS 15, Apple Silicon
+      label: Operating system and hardware
+      placeholder: Windows 11 x64 or macOS 15 Apple Silicon
     validations:
       required: true
   - type: textarea

@@ -22,8 +22,40 @@ jobs:
       - run: npm run build
       - run: npm test
       - run: npm run dist:mac
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-release
+          path: |
+            output/Skill-Session-Profiles-*.dmg
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
+      - run: npm run dist:win
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-release
+          path: output/Skill-Session-Profiles-*.exe
+  release:
+    needs:
+      - macos
+      - windows
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: "*-release"
+          path: release-artifacts
+          merge-multiple: true
       - uses: softprops/action-gh-release@v3
         with:
-          files: |
-            output/Skill-Session-Profiles-*.dmg
+          files: release-artifacts/*
           generate_release_notes: true

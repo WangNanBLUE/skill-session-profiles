@@ -30,4 +30,20 @@ describe("resolveCodexCommand", () => {
 
     await expect(resolveCodexCommand()).resolves.toBe(bundledCodex);
   });
+
+  it("finds an npm Codex command shim on Windows", async () => {
+    const command = "C:\\Users\\blue\\AppData\\Roaming\\npm\\codex.cmd";
+    const missing = Object.assign(new Error("missing"), { code: "ENOENT" });
+
+    vi.stubEnv("PATH", "C:\\Users\\blue\\AppData\\Roaming\\npm");
+    vi.stubEnv("CODEX_BINARY", "");
+    vi.stubEnv("CODEX_BIN", "");
+    fsMocks.access.mockImplementation(async (candidate: string) => {
+      if (candidate === command) return;
+      throw missing;
+    });
+    fsMocks.readdir.mockRejectedValue(missing);
+
+    await expect(resolveCodexCommand("win32")).resolves.toBe(command);
+  });
 });

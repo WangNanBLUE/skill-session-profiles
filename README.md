@@ -73,12 +73,12 @@ User data is stored locally at:
 ~/.codex/skill-session-profiles
 ```
 
-The app currently targets macOS on Apple Silicon. Builds are unsigned and not
-notarized.
+The app supports macOS on Apple Silicon and Windows x64. Builds are unsigned;
+macOS builds are not notarized.
 
 ## Requirements
 
-- macOS on Apple Silicon
+- macOS on Apple Silicon or Windows x64
 - Codex CLI installed and available in `PATH`
 
 ## Development
@@ -97,6 +97,7 @@ npm run test:e2e
 npm run test:codex-integration
 npm run test:electron
 npm run dist:mac
+npm run dist:win
 ```
 
 `test:codex-integration` launches a real Codex app-server process.
@@ -108,10 +109,12 @@ unit, and browser E2E checks.
 
 ```bash
 npm run dist:mac
+# On Windows:
+npm run dist:win
 ```
 
-The `.app` bundle and DMG are written to `output/`. Release artifacts are not
-committed to the repository.
+The macOS `.app` bundle and DMG, or the Windows NSIS installer, are written to
+`output/`. Release artifacts are not committed to the repository.
 
 ## Security
 

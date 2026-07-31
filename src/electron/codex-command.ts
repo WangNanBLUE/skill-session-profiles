@@ -1,18 +1,20 @@
 import { constants } from "node:fs";
 import { access, readdir } from "node:fs/promises";
 import { homedir } from "node:os";
-import { delimiter, join } from "node:path";
+import { delimiter, join, win32 } from "node:path";
 import { promisify } from "node:util";
 import { execFile } from "node:child_process";
 
 const execFileAsync = promisify(execFile);
 
-export async function resolveCodexCommand(): Promise<string> {
+export async function resolveCodexCommand(
+  platform: NodeJS.Platform = process.platform,
+): Promise<string> {
   const home = homedir();
   const configured = process.env.CODEX_BINARY ?? process.env.CODEX_BIN;
   const candidates = [
     configured,
-    ...pathCandidates(process.env.PATH),
+    ...pathCandidates(process.env.PATH, platform),
     "/opt/homebrew/bin/codex",
     "/usr/local/bin/codex",
     "/Applications/ChatGPT.app/Contents/Resources/codex",
@@ -27,6 +29,12 @@ export async function resolveCodexCommand(): Promise<string> {
 
   for (const candidate of candidates) {
     if (await isExecutable(candidate)) return candidate;
+  }
+
+  if (platform === "win32") {
+    throw new Error(
+      "找不到 Codex CLI。请先安装 Codex，或设置 CODEX_BINARY 为 codex.exe 或 codex.cmd 的绝对路径。",
+    );
   }
 
   try {
@@ -45,11 +53,19 @@ export async function resolveCodexCommand(): Promise<string> {
   );
 }
 
-function pathCandidates(pathValue: string | undefined): string[] {
+function pathCandidates(
+  pathValue: string | undefined,
+  platform: NodeJS.Platform,
+): string[] {
+  const commandNames = platform === "win32"
+    ? ["codex.exe", "codex.cmd", "codex"]
+    : ["codex"];
+  const pathDelimiter = platform === "win32" ? win32.delimiter : delimiter;
+  const joinPath = platform === "win32" ? win32.join : join;
   return (pathValue ?? "")
-    .split(delimiter)
+    .split(pathDelimiter)
     .filter(Boolean)
-    .map((entry) => join(entry, "codex"));
+    .flatMap((entry) => commandNames.map((name) => joinPath(entry, name)));
 }
 
 async function nvmCandidates(root: string): Promise<string[]> {

@@ -64,11 +64,11 @@ Skill 时不会应用项目级覆盖。项目 `AGENTS.md` 在全局规则之后�
 ~/.codex/skill-session-profiles
 ```
 
-当前版本仅支持 Apple Silicon Mac，构建产物未签名、未公证。
+当前版本支持 Apple Silicon Mac 和 Windows x64。构建产物未签名，macOS 产物未公证。
 
 ## 环境要求
 
-- Apple Silicon Mac
+- Apple Silicon Mac 或 Windows x64
 - 已安装 Codex CLI，且可通过 `PATH` 调用
 
 ## 本地开发
@@ -87,6 +87,7 @@ npm run test:e2e
 npm run test:codex-integration
 npm run test:electron
 npm run dist:mac
+npm run dist:win
 ```
 
 `test:codex-integration` 会启动真实 Codex app-server 进程，
@@ -97,9 +98,12 @@ GitHub CI 只运行可移植的构建、单元测试和浏览器 E2E。
 
 ```bash
 npm run dist:mac
+# Windows 系统：
+npm run dist:win
 ```
 
-`.app` 和 DMG 会输出到 `output/`，发布产物不提交进 Git 仓库。
+macOS 的 `.app`、DMG 或 Windows 的 NSIS 安装程序会输出到 `output/`，
+发布产物不提交进 Git 仓库。
 
 ## 参与贡献
 

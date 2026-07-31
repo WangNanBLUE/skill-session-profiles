@@ -1,4 +1,4 @@
-# Skill Session Profiles for macOS
+# Skill Session Profiles Desktop App
 
 The standalone app stores profiles and audit data at:
 
@@ -8,7 +8,7 @@ The standalone app stores profiles and audit data at:
 
 ## Requirements
 
-- macOS on Apple Silicon
+- macOS on Apple Silicon or Windows x64
 - Codex CLI installed and available through `PATH`, nvm, Volta, asdf, mise,
   Homebrew, or `CODEX_BINARY`
 
@@ -32,10 +32,12 @@ npm run test:electron
 ```bash
 npm run pack:mac
 npm run dist:mac
+npm run pack:win
+npm run dist:win
 ```
 
 Artifacts are written under `output/`. The first release is intentionally
-unsigned and not notarized. On another Mac, open it through Finder's
+unsigned; macOS builds are not notarized. On another Mac, open it through Finder's
 contextual **Open** action if Gatekeeper blocks the first launch.
 
 ## Desktop Security

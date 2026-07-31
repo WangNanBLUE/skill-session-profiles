@@ -2,8 +2,27 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   AppServerClient,
+  codexAppServerInvocation,
   type LineTransport,
 } from "../src/server/app-server-client.js";
+
+describe("codexAppServerInvocation", () => {
+  it("runs Windows npm command shims through cmd.exe", () => {
+    expect(codexAppServerInvocation("C:\\npm\\codex.cmd", "win32", "cmd.exe"))
+      .toEqual({
+        command: "cmd.exe",
+        args: ["/d", "/s", "/c", '"C:\\npm\\codex.cmd" app-server --stdio'],
+      });
+  });
+
+  it("launches native executables directly", () => {
+    expect(codexAppServerInvocation("C:\\bin\\codex.exe", "win32"))
+      .toEqual({
+        command: "C:\\bin\\codex.exe",
+        args: ["app-server", "--stdio"],
+      });
+  });
+});
 
 class FakeLineTransport implements LineTransport {
   readonly writes: string[] = [];

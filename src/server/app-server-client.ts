@@ -50,6 +50,20 @@ export function codexChildEnvironment(
   };
 }
 
+export function codexAppServerInvocation(
+  codexCommand: string,
+  platform: NodeJS.Platform = process.platform,
+  comSpec = process.env.ComSpec || "cmd.exe",
+): { command: string; args: string[] } {
+  if (platform === "win32" && /\.(?:cmd|bat)$/i.test(codexCommand)) {
+    return {
+      command: comSpec,
+      args: ["/d", "/s", "/c", `"${codexCommand}" app-server --stdio`],
+    };
+  }
+  return { command: codexCommand, args: ["app-server", "--stdio"] };
+}
+
 export class CodexAppServerLineTransport implements LineTransport {
   private readonly child: ChildProcessWithoutNullStreams;
   private readonly lineListeners = new Set<(line: string) => void>();
@@ -61,7 +75,8 @@ export class CodexAppServerLineTransport implements LineTransport {
   private resolveClose: (() => void) | undefined;
 
   constructor(codexCommand = "codex") {
-    this.child = spawn(codexCommand, ["app-server", "--stdio"], {
+    const invocation = codexAppServerInvocation(codexCommand);
+    this.child = spawn(invocation.command, invocation.args, {
       env: codexChildEnvironment(codexCommand),
       shell: false,
       stdio: ["pipe", "pipe", "pipe"],

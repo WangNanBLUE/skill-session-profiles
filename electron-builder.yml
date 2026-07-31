@@ -21,3 +21,15 @@ mac:
 dmg:
   title: Skill Session Profiles
   sign: false
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  icon: assets/logo.png
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
