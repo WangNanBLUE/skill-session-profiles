@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.2] - 2026-07-31
+
+### Fixed
+
+- Skip unsupported directory `fsync` calls on Windows after atomic profile writes.
+- Keep the Windows release gate focused on platform-specific command launching;
+  the portable and macOS jobs continue to run the complete test suite.
+
 ## [0.3.1] - 2026-07-31
 
 ### Added

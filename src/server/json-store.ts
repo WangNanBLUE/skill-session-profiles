@@ -86,6 +86,7 @@ export class JsonStore {
       await handle.close();
     }
     await rename(temporary, target);
+    if (process.platform === "win32") return;
     const directory = await open(dirname(target), "r");
     try {
       await directory.sync();
