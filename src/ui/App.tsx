@@ -56,6 +56,7 @@ type State = {
   projectMcpConfig?: { value: ResourceToggleEntry[]; filePath: string };
   projects: CodexProject[];
   profiles: SkillProfile[];
+  activeProfileId?: string | null;
   writable: boolean;
 };
 type ControlResource = {
@@ -74,7 +75,7 @@ const COPY = {
     defaultBehavior: "默认行为", defaultDetail: "所有新任务首先继承这里的设置。配置方案只保存明确的单项覆盖。",
     totalSkills: "Skill 总数", enabledByDefault: "默认启用", disabledByDefault: "默认停用",
     persistentDetail: "应用后，后续打开的所有 Codex 任务都会沿用此配置。",
-    projectDetail: "仅对此项目生效；保存到受信任项目的 Codex 原生配置层，未设置项继承全局默认。",
+    projectDetail: "仅对此项目生效；保存到项目根目录 AGENTS.md 的受管区块，未设置项继承全局默认。",
     profileDetail: "保存可复用的单项覆盖；未设置项始终继承全局默认。",
     import: "导入", export: "导出", profileName: "方案名称", profilePlaceholder: "例如：代码审查",
     defaultsDetail: "这里的启用状态是所有新任务和配置方案的继承基础。", enabledItems: "项启用",
@@ -102,7 +103,7 @@ const COPY = {
     defaultBehavior: "Default behavior", defaultDetail: "New tasks inherit these settings. Profiles store explicit overrides only.",
     totalSkills: "Total skills", enabledByDefault: "Enabled by default", disabledByDefault: "Disabled by default",
     persistentDetail: "After applying, all subsequently opened Codex tasks will use this configuration.",
-    projectDetail: "Applies only to this project through Codex's native trusted-project configuration; unset skills inherit global defaults.",
+    projectDetail: "Applies only to this project through a managed block in the project-root AGENTS.md; unset skills inherit global defaults.",
     profileDetail: "Save reusable overrides. Unset skills always inherit global defaults.",
     import: "Import", export: "Export", profileName: "Profile name", profilePlaceholder: "Example: Code review",
     defaultsDetail: "These states are inherited by new tasks and profiles.", enabledItems: "enabled",
@@ -127,6 +128,7 @@ const COPY = {
 type UiCopy = typeof COPY.zh;
 const LanguageContext = createContext<Language>("zh");
 const useCopy = (): UiCopy => COPY[useContext(LanguageContext)];
+const SHOW_RESOURCE_CONTROLS = false;
 
 export function App({ api, cwd }: { api: AppApi; cwd: string }) {
   const [activeCwd, setActiveCwd] = useState(cwd);
@@ -430,7 +432,7 @@ export function App({ api, cwd }: { api: AppApi; cwd: string }) {
       </div>
     </header>
 
-    <nav className="resource-tabs" aria-label={language === "zh" ? "资源类型" : "Resource type"}>
+    {SHOW_RESOURCE_CONTROLS && <nav className="resource-tabs" aria-label={language === "zh" ? "资源类型" : "Resource type"}>
       {([
         ["plugin", copy.plugins, state?.plugins?.length ?? 0],
         ["mcp", copy.mcp, state?.mcpServers?.length ?? 0],
@@ -446,7 +448,7 @@ export function App({ api, cwd }: { api: AppApi; cwd: string }) {
           setScopeFilter("all");
         }}
       ><span>{label}</span><small>{count}</small></button>)}
-    </nav>
+    </nav>}
 
     <div className="state-stack">
       {error && <div className="state-banner error-banner" role="alert">
@@ -484,6 +486,7 @@ export function App({ api, cwd }: { api: AppApi; cwd: string }) {
           profiles={state?.profiles ?? []}
           inventoryPaths={inventoryPaths}
           selectedId={nextProfileId}
+          activeId={state?.activeProfileId ?? null}
           draft={profileDraft}
           deleteConfirmId={deleteConfirmId}
           onChoose={(profile) => {
@@ -803,6 +806,7 @@ export function App({ api, cwd }: { api: AppApi; cwd: string }) {
           disabled={busy || state?.writable === false}
           onClick={() => void run("apply_skill_configuration", {
             cwd: activeCwd,
+            profileId: nextProfileId,
             overrides: currentNextOverrides,
           }, () => {
             setSuccess(language === "zh"
@@ -941,10 +945,11 @@ function ProjectRail({ projects, activeCwd, onSelect }: {
   </div>;
 }
 
-function ProfilesRail({ profiles, inventoryPaths, selectedId, draft, deleteConfirmId, onChoose, onCreate, onSelect, onCopy, onRequestDelete, onDelete }: {
+function ProfilesRail({ profiles, inventoryPaths, selectedId, activeId, draft, deleteConfirmId, onChoose, onCreate, onSelect, onCopy, onRequestDelete, onDelete }: {
   profiles: SkillProfile[];
   inventoryPaths: ReadonlySet<string>;
   selectedId: string | null;
+  activeId: string | null;
   draft: ProfileDraft | null;
   deleteConfirmId: string | null;
   onChoose(profile: SkillProfile | null): void;
@@ -969,7 +974,11 @@ function ProfilesRail({ profiles, inventoryPaths, selectedId, draft, deleteConfi
         onClick={() => onChoose(null)}
       >
         <span className="profile-symbol"><Globe2 size={16} /></span>
-        <span><strong>{english ? "Inherit global defaults" : "继承全局默认"}</strong><small>{english ? "No saved profile" : "不使用已保存方案"}</small></span>
+        <span>
+          <strong>{english ? "Inherit global defaults" : "继承全局默认"}{activeId === null
+            && <em className="active-profile-badge">{english ? "In use" : "使用中"}</em>}</strong>
+          <small>{english ? "No saved profile" : "不使用已保存方案"}</small>
+        </span>
         {selectedId === null && draft === null && <Check size={16} />}
       </button>
       {profiles.map((profile) => <div
@@ -978,7 +987,11 @@ function ProfilesRail({ profiles, inventoryPaths, selectedId, draft, deleteConfi
       >
         <button className="profile-main" onClick={() => onChoose(profile)}>
           <span className="profile-symbol"><SlidersHorizontal size={16} /></span>
-          <span><strong>{profile.name}</strong><small>{overrideSummary(profile.overrides, inventoryPaths, true, english ? "en" : "zh")}</small></span>
+          <span>
+            <strong>{profile.name}{activeId === profile.id
+              && <em className="active-profile-badge">{english ? "In use" : "使用中"}</em>}</strong>
+            <small>{overrideSummary(profile.overrides, inventoryPaths, true, english ? "en" : "zh")}</small>
+          </span>
         </button>
         {deleteConfirmId === profile.id
           ? <div className="inline-confirm">

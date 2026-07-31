@@ -38,7 +38,8 @@ The app is currently unsigned and not notarized.
   directly from Task Configuration.
 - Save profiles as reusable templates, then explicitly apply one on top of
   global defaults for subsequently opened tasks.
-- Save project-specific overrides to the selected project's `.codex/config.toml`.
+- Save project-specific Skill guidance in a managed block inside the selected
+  project's `AGENTS.md`.
 - Select local projects in the same order as the Codex project sidebar.
 - Edit global skill defaults through the Codex App Server contract.
 - Switch between Chinese and English, light and dark themes.
@@ -52,12 +53,19 @@ Saving a profile only updates the reusable template. Selecting and applying it
 from Task Configuration writes its explicit overrides to the user-level
 configuration; editing the template later does not silently reapply it.
 
-Project configurations contain explicit overrides only. The app updates
-`.codex/config.toml` through the Codex App Server filesystem API while
-preserving unrelated TOML and comments. Codex's trusted-project layer parses
-those settings. Codex CLI 0.140.0 does not apply project-level overrides to
-plugin-provided skills during discovery, so user-level configuration remains
-the only reliable way to disable those skills across Codex tasks.
+Project configurations contain explicit overrides only. The app updates a
+marked, managed block in the project-root `AGENTS.md` through the Codex App
+Server filesystem API while preserving all unrelated project guidance.
+If the project root already contains `AGENTS.override.md`, the app updates that
+active file instead because Codex gives it precedence over `AGENTS.md`.
+
+This is a temporary compatibility approach. Codex CLI 0.140.0 parses project
+`skills.config` but does not apply project-level overrides to plugin-provided
+Skills during discovery. Project `AGENTS.md` guidance is loaded after global
+guidance, so it can instruct Codex not to invoke selected Skills in that
+project without changing global configuration. This is instruction-level
+control: disabled Skills can still appear in discovery, and an explicitly
+allowed Skill must already be installed, loaded, and enabled globally.
 
 User data is stored locally at:
 

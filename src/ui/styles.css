@@ -90,7 +90,7 @@ dd {
 
 .desktop-shell {
   display: grid;
-  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
   width: 100%;
   height: 100%;
   min-height: 600px;
@@ -516,6 +516,19 @@ dd {
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.active-profile-badge {
+  display: inline-flex;
+  margin-left: 6px;
+  padding: 1px 5px;
+  border-radius: var(--radius-xs);
+  color: var(--command);
+  background: var(--surface-selected);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 600;
+  vertical-align: 1px;
 }
 
 .profile-item small,

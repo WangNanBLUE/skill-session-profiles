@@ -78,6 +78,7 @@ let state = {
     { id: "radio", name: "Mineradio", rootPaths: ["/Users/demo/projects/Mineradio"] },
   ],
   profiles,
+  activeProfileId: null as string | null,
   writable: true,
 };
 const api = {
@@ -130,6 +131,13 @@ const api = {
         profiles: [...state.profiles.filter((item) => item.id !== profile.id), profile],
       };
       return { profile };
+    }
+    if (name === "apply_skill_configuration") {
+      state = {
+        ...state,
+        activeProfileId: args.profileId as string | null,
+      };
+      return { value: args.overrides };
     }
     return state;
   },

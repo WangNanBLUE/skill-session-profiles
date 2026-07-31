@@ -1,6 +1,5 @@
 import {
   extractProjectResourceLayer,
-  extractProjectSkillLayer,
   extractUserResourceLayer,
   extractUserSkillLayer,
 } from "./config-layer.js";
@@ -9,6 +8,7 @@ import { resolveCodexHome } from "./data-root.js";
 import { type AppServerClient } from "./app-server-client.js";
 import { JsonStore } from "./json-store.js";
 import { ProfileService } from "./profile-service.js";
+import { readProjectSkillPolicy } from "./project-agents.js";
 import {
   ResourceControlService,
   type ResourceKind,
@@ -67,6 +67,7 @@ const callSchema = z.discriminatedUnion("name", [
     name: z.literal("apply_skill_configuration"),
     args: z.object({
       cwd: z.string().refine((value) => value.startsWith("/")),
+      profileId: z.string().nullable(),
       overrides: z.array(skillOverrideSchema),
     }),
   }),
@@ -128,6 +129,7 @@ export class SkillProfileBackend {
       projects,
       pluginList,
       curatedSkillPaths,
+      projectSkillPolicy,
     ] = await Promise.all([
       this.client.listSkills([cwd]),
       this.client.readConfig(cwd),
@@ -137,6 +139,7 @@ export class SkillProfileBackend {
       listCodexProjects(),
       this.client.listPlugins().catch((): null => null),
       readCodexCuratedSkillPaths(),
+      readProjectSkillPolicy(this.client, cwd),
     ]);
     const plugins = pluginInventory(pluginList, globalConfig, config);
     const mcpServers = mcpInventory(globalConfig, config);
@@ -159,13 +162,12 @@ export class SkillProfileBackend {
     const toInventoryPaths = (value: SkillConfigEntry[]) => value
       .filter((entry): entry is SkillConfigEntry & { path: string } => entry.path !== undefined)
       .map((entry) => ({ ...entry, path: inventoryPaths.get(normalize(entry.path)) ?? entry.path }));
-    const projectLayer = extractProjectSkillLayer(config, cwd);
     return {
       skills,
       globalDefaults: toInventoryPaths(extractUserSkillLayer(config).value),
       projectConfig: {
-        ...projectLayer,
-        value: toInventoryPaths(projectLayer.value),
+        filePath: projectSkillPolicy.filePath,
+        value: toInventoryPaths(projectSkillPolicy.value),
       },
       plugins,
       mcpServers,
@@ -175,6 +177,7 @@ export class SkillProfileBackend {
       projectMcpConfig: extractProjectResourceLayer(config, cwd, "mcp_servers"),
       projects,
       profiles: profiles.profiles,
+      activeProfileId: profiles.activeProfileId ?? null,
       writable,
     };
   }
@@ -193,7 +196,13 @@ export class SkillProfileBackend {
         await this.service.deleteProfile(input.args.id);
         return { deleted: input.args.id };
       case "apply_skill_configuration":
-        return { value: await this.service.applyPersistent(input.args.cwd, input.args.overrides) };
+        return {
+          value: await this.service.applyPersistent(
+            input.args.cwd,
+            input.args.overrides,
+            input.args.profileId,
+          ),
+        };
       case "save_project_skill_configuration":
         return { value: await this.service.saveProjectConfiguration(input.args.cwd, input.args.overrides) };
       case "save_global_resource_configuration": {

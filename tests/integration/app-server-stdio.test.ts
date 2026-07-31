@@ -32,7 +32,7 @@ it("reads Codex state without an app-server control socket", async () => {
   }
 });
 
-it("saves project skill configuration through the real app-server filesystem API", async () => {
+it("saves project skill policy to AGENTS.md through the real app-server filesystem API", async () => {
   const projectRoot = await mkdtemp(join(tmpdir(), "skill-profiles-project-"));
   const dataRoot = await mkdtemp(join(tmpdir(), "skill-profiles-data-"));
   const codexHome = await mkdtemp(join(tmpdir(), "skill-profiles-codex-home-"));
@@ -42,9 +42,8 @@ it("saves project skill configuration through the real app-server filesystem API
     join(codexHome, "config.toml"),
     `[projects.${JSON.stringify(await realpath(projectRoot))}]\ntrust_level = "trusted"\n`,
   );
-  const projectConfig = join(projectRoot, ".codex", "config.toml");
-  await mkdir(join(projectRoot, ".codex"));
-  await writeFile(projectConfig, '# Preserve this comment\nmodel = "gpt-5"\n');
+  const agentsFile = join(projectRoot, "AGENTS.md");
+  await writeFile(agentsFile, "# Preserve this guidance\n");
   const client = new AppServerClient();
   const service = new ProfileService(client, new JsonStore(dataRoot));
 
@@ -55,15 +54,12 @@ it("saves project skill configuration through the real app-server filesystem API
     await expect(service.saveProjectConfiguration(projectRoot, [
       { path: skillPath as string, state: "disabled" },
     ])).resolves.toEqual([{ path: skillPath as string, enabled: false }]);
-    await expect(readFile(projectConfig, "utf8")).resolves.toContain(
-      `# Preserve this comment\nmodel = "gpt-5"\n\n[[skills.config]]\npath = ${JSON.stringify(skillPath)}`,
+    await expect(readFile(agentsFile, "utf8")).resolves.toContain(
+      `# Preserve this guidance\n\n<!-- skill-session-profiles:start -->`,
     );
-    const updatedConfig = await client.readConfig(projectRoot);
-    expect(updatedConfig.layers?.find(
-      (layer) => layer.name.type === "project",
-    )?.config).toMatchObject({
-      skills: { config: [{ path: skillPath, enabled: false }] },
-    });
+    await expect(readFile(agentsFile, "utf8")).resolves.toContain(
+      `Do not invoke or read`,
+    );
   } finally {
     await client.close();
     if (previousCodexHome === undefined) {

@@ -1,10 +1,10 @@
 import { randomUUID } from "node:crypto";
-import { basename, dirname, isAbsolute, join, normalize } from "node:path";
+import { basename, isAbsolute, join, normalize } from "node:path";
 
 import type { AppServerClient } from "./app-server-client.js";
-import { extractProjectSkillLayer, extractUserSkillLayer } from "./config-layer.js";
+import { extractUserSkillLayer } from "./config-layer.js";
 import { JsonStore } from "./json-store.js";
-import { replaceProjectSkillConfig } from "./project-config.js";
+import { readProjectSkillPolicy, replaceProjectSkillPolicy } from "./project-agents.js";
 import {
   skillProfileSchema,
   type SkillConfigEntry,
@@ -73,6 +73,7 @@ export class ProfileService {
         updatedAt: now,
       });
       file.profiles = [...file.profiles.filter((item) => item.id !== profile.id), profile];
+      if (file.activeProfileId === profile.id) file.activeProfileId = null;
       await this.store.writeProfiles(file);
       return profile;
     });
@@ -82,6 +83,7 @@ export class ProfileService {
     await this.store.withLock(async () => {
       const file = await this.store.readProfiles();
       file.profiles = file.profiles.filter((profile) => profile.id !== id);
+      if (file.activeProfileId === id) file.activeProfileId = null;
       await this.store.writeProfiles(file);
     });
   }
@@ -105,10 +107,17 @@ export class ProfileService {
         throw new Error("unknown skill path");
       }
       await this.client.batchWriteSkillsConfig(normalized, layer.version);
+      const file = await this.store.readProfiles();
+      file.activeProfileId = null;
+      await this.store.writeProfiles(file);
     });
   }
 
-  async applyPersistent(cwd: string, overrides: SkillOverride[]): Promise<SkillConfigEntry[]> {
+  async applyPersistent(
+    cwd: string,
+    overrides: SkillOverride[],
+    profileId: string | null,
+  ): Promise<SkillConfigEntry[]> {
     await this.requireBatchWrite();
     return this.store.withLock(async () => {
       const inventory = await this.client.listSkills([cwd], true);
@@ -126,6 +135,9 @@ export class ProfileService {
       }
       const target = resolveTarget(layer.value, overrides);
       await this.client.batchWriteSkillsConfig(target, layer.version);
+      const file = await this.store.readProfiles();
+      file.activeProfileId = profileId;
+      await this.store.writeProfiles(file);
       await this.store.appendAudit({ action: "applied", cwd });
       return target;
     });
@@ -134,7 +146,7 @@ export class ProfileService {
   async saveProjectConfiguration(cwd: string, overrides: SkillOverride[]): Promise<SkillConfigEntry[]> {
     return this.store.withLock(async () => {
       const inventory = await this.client.listSkills([cwd], true);
-      const layer = extractProjectSkillLayer(await this.client.readConfig(cwd), cwd);
+      const layer = await readProjectSkillPolicy(this.client, cwd);
       const allowed = new Set(canonicalize([
         ...inventory.data.flatMap((item) => item.skills.map((skill) => ({
           path: skill.path, enabled: skill.enabled,
@@ -153,14 +165,9 @@ export class ProfileService {
           enabled: state === "enabled",
         })),
       ]);
-      const directory = dirname(layer.filePath);
-      await this.client.createDirectory(directory);
-      const entries = await this.client.readDirectory(directory);
-      const source = entries.some((entry) =>
-        entry.fileName === basename(layer.filePath) && entry.isFile)
-        ? await this.client.readFile(layer.filePath)
-        : "";
-      const updated = replaceProjectSkillConfig(source, value);
+      const names = new Map(inventory.data.flatMap((item) =>
+        item.skills.map((skill) => [canonicalize([{ path: skill.path, enabled: true }])[0].path!, skill.name] as const)));
+      const updated = replaceProjectSkillPolicy(layer.source, value, names);
       await this.client.writeFile(layer.filePath, updated);
       await this.store.appendAudit({ action: "project-config-saved", cwd });
       return value;

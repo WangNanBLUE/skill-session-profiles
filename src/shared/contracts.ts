@@ -45,6 +45,7 @@ export const skillProfileSchema = z.object({
 export const profilesFileSchema = z.object({
   schemaVersion: z.literal(1),
   profiles: z.array(skillProfileSchema),
+  activeProfileId: z.string().nullable().optional(),
 });
 
 export type SkillOverride = z.infer<typeof skillOverrideSchema>;

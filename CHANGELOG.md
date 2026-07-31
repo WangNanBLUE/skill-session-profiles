@@ -5,17 +5,29 @@ All notable changes to this project will be documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.3.0] - 2026-07-31
+
+### Added
+
+- Discover local Codex projects for project-specific Skill policies.
+- Include plugin-provided Skills in the configurable inventory while filtering
+  Codex built-in and curated Skills.
+- Show the last successfully applied task profile with a persistent "In use"
+  marker.
 
 ### Changed
 
-- Write project skill overrides to Codex's native trusted-project configuration
-  layer, while documenting the Codex CLI 0.140.0 limitation for plugin skills.
+- Write project-specific Skill policy to a managed `AGENTS.md` or
+  `AGENTS.override.md` block while preserving existing project guidance.
+- Keep task profile application persistent without relying on a lifecycle hook.
+- Hide plugin and MCP controls until their project-scoped behavior is reliable.
+- Improve project switching so the current workbench remains visible while the
+  next project loads.
 
 ### Removed
 
-- Remove the Codex plugin, MCP panel, packaged skill, and lifecycle hook.
-- Remove the legacy one-time pending configuration transaction.
+- Remove the Codex plugin, MCP panel, packaged Skill, lifecycle hook, and legacy
+  one-time pending configuration transaction.
 
 ## [0.2.1] - 2026-07-30
 

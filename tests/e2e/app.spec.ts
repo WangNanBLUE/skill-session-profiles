@@ -33,6 +33,15 @@ test("new session overrides use the shared bulk controls", async ({ page }) => {
   await expect(page.getByRole("button", { name: "全部禁用（10）" })).toBeVisible();
 });
 
+test("task profile list distinguishes selection from the applied profile", async ({ page }) => {
+  await page.goto("/tests/e2e/demo.html");
+  await expect(page.getByRole("button", { name: /继承全局默认.*使用中/ })).toBeVisible();
+  await page.getByRole("button", { name: "日常开发 1 当前" }).click();
+  await expect(page.getByRole("button", { name: /继承全局默认.*使用中/ })).toBeVisible();
+  await page.getByRole("button", { name: "应用此配置" }).click();
+  await expect(page.getByRole("button", { name: /日常开发.*使用中/ })).toBeVisible();
+});
+
 test("workbench fills the window when no state banner is present", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/tests/e2e/demo.html");
@@ -70,37 +79,10 @@ test("project configuration selects from Codex projects", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Mineradio" })).toBeVisible();
 });
 
-test("plugin settings support global toggles and project inheritance", async ({ page }) => {
+test("plugin and MCP controls are hidden", async ({ page }) => {
   await page.goto("/tests/e2e/demo.html");
-  await page.getByRole("button", { name: "插件 2" }).click();
-
-  const browserToggle = page.getByRole("checkbox", { name: "Browser 状态" });
-  await expect(browserToggle).toBeChecked();
-  await browserToggle.locator("..").click();
-  await expect(browserToggle).not.toBeChecked();
-  await page.getByRole("button", { name: "保存配置" }).click();
-  await expect(page.getByText("资源配置已保存。")).toBeVisible();
-
-  await page.getByRole("button", { name: "项目 1" }).click();
-  const browserSetting = page.getByRole("group", { name: "Browser 设置" });
-  await expect(browserSetting.getByRole("radio", { name: "继承" })).toBeChecked();
-  await browserSetting.getByRole("radio", { name: "停用" }).locator("..").click();
-  await page.getByRole("button", { name: "保存配置" }).click();
-  await expect(browserSetting.getByRole("radio", { name: "停用" })).toBeChecked();
-});
-
-test("MCP settings support global and project controls", async ({ page }) => {
-  await page.goto("/tests/e2e/demo.html");
-  await page.getByRole("button", { name: "MCP 2" }).click();
-
-  const localToggle = page.getByRole("checkbox", { name: "local-tools 状态" });
-  await localToggle.locator("..").click();
-  await expect(localToggle).not.toBeChecked();
-  await page.getByRole("button", { name: "保存配置" }).click();
-  await page.getByRole("button", { name: "项目 1" }).click();
-  const setting = page.getByRole("group", { name: "local-tools 设置" });
-  await expect(setting.getByRole("radio", { name: "停用" })).toBeChecked();
-  await setting.getByRole("radio", { name: "继承" }).locator("..").click();
-  await page.getByRole("button", { name: "保存配置" }).click();
-  await expect(setting.getByRole("radio", { name: "继承" })).toBeChecked();
+  await expect(page.getByRole("navigation", { name: "资源类型" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "插件 2" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "MCP 2" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "任务配置" })).toBeVisible();
 });

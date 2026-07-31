@@ -30,10 +30,10 @@ function fakeClient(paths = ["/skills/a/SKILL.md"]) {
     })), errors: [] }] }),
     readConfig,
     batchWriteSkillsConfig: vi.fn(),
-    readFile: vi.fn().mockResolvedValue('model = "gpt-5"\n'),
+    readFile: vi.fn().mockResolvedValue("# Existing project guidance\n"),
     writeFile: vi.fn(),
     readDirectory: vi.fn().mockResolvedValue([
-      { fileName: "config.toml", isDirectory: false, isFile: true },
+      { fileName: "AGENTS.md", isDirectory: false, isFile: true },
     ]),
     createDirectory: vi.fn(),
     canBatchWrite: vi.fn().mockResolvedValue(true),
@@ -75,15 +75,16 @@ describe("profile resolution", () => {
     const setup = await service();
     await expect(setup.service.applyPersistent("/repo", [
       { path: "/skills/a/SKILL.md", state: "enabled" },
-    ])).resolves.toEqual([
+    ], "p1")).resolves.toEqual([
       { path: "/skills/a/SKILL.md", enabled: true },
     ]);
     expect(setup.client.batchWriteSkillsConfig).toHaveBeenCalledWith([
       { path: "/skills/a/SKILL.md", enabled: true },
     ], "v1");
+    expect(await setup.store.readProfiles()).toMatchObject({ activeProfileId: "p1" });
   });
 
-  it("writes project overrides through the filesystem API without replacing other config", async () => {
+  it("writes project overrides to AGENTS.md without replacing existing guidance", async () => {
     const setup = await service();
     await expect(setup.service.saveProjectConfiguration("/repo", [
       { path: "/skills/a/SKILL.md", state: "disabled" },
@@ -91,16 +92,14 @@ describe("profile resolution", () => {
       { path: "/skills/a/SKILL.md", enabled: false },
     ]);
     expect(setup.client.writeFile).toHaveBeenCalledWith(
-      "/repo/.codex/config.toml",
-      [
-        'model = "gpt-5"',
-        "",
-        "[[skills.config]]",
-        'path = "/skills/a/SKILL.md"',
-        "enabled = false",
-        "",
-      ].join("\n"),
+      "/repo/AGENTS.md",
+      expect.any(String),
     );
+    const [filePath, source] = vi.mocked(setup.client.writeFile).mock.calls[0];
+    expect(filePath).toBe("/repo/AGENTS.md");
+    expect(source).toContain("# Existing project guidance");
+    expect(source).toContain("- Do not invoke or read");
+    expect(source).toContain("`/skills/a/SKILL.md`");
     expect(setup.client.batchWriteSkillsConfig).not.toHaveBeenCalled();
   });
 

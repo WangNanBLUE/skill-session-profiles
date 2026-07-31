@@ -72,6 +72,7 @@ it("keeps project-only MCP servers out of global configuration", async () => {
     }),
     readConfig: vi.fn(async (cwd?: string) =>
       cwd === undefined ? globalConfig : projectConfig),
+    readDirectory: vi.fn().mockResolvedValue([]),
     canBatchWrite: vi.fn().mockResolvedValue(true),
     listPlugins: vi.fn().mockResolvedValue({ marketplaces: [] }),
     batchWriteResourceConfig: vi.fn(),
@@ -143,6 +144,7 @@ it("matches Codex installed plugin inventory instead of configured remnants", as
       data: [{ cwd: "/repo", skills: [], errors: [] }],
     }),
     readConfig: vi.fn().mockResolvedValue(globalConfig),
+    readDirectory: vi.fn().mockResolvedValue([]),
     canBatchWrite: vi.fn().mockResolvedValue(true),
     listPlugins: vi.fn().mockResolvedValue({
       marketplaces: [{
@@ -212,6 +214,7 @@ it("uses configured plugins only when Codex plugin inventory is unavailable", as
       data: [{ cwd: "/repo", skills: [], errors: [] }],
     }),
     readConfig: vi.fn().mockResolvedValue(config),
+    readDirectory: vi.fn().mockResolvedValue([]),
     canBatchWrite: vi.fn().mockResolvedValue(true),
     listPlugins: vi.fn().mockRejectedValue(new Error("plugin/list unavailable")),
   } as unknown as AppServerClient;
@@ -279,6 +282,7 @@ it("includes plugin skills while hiding Codex-provided skills", async () => {
       }],
     }),
     readConfig: vi.fn().mockResolvedValue(config),
+    readDirectory: vi.fn().mockResolvedValue([]),
     canBatchWrite: vi.fn().mockResolvedValue(true),
     listPlugins: vi.fn().mockResolvedValue({ marketplaces: [] }),
   } as unknown as AppServerClient;
