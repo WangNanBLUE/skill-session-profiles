@@ -1,5 +1,5 @@
-import { createHash, randomUUID } from "node:crypto";
-import { basename, dirname, isAbsolute, normalize } from "node:path";
+import { randomUUID } from "node:crypto";
+import { basename, dirname, isAbsolute, join, normalize } from "node:path";
 
 import type { AppServerClient } from "./app-server-client.js";
 import { extractProjectSkillLayer, extractUserSkillLayer } from "./config-layer.js";
@@ -7,7 +7,6 @@ import { JsonStore } from "./json-store.js";
 import { replaceProjectSkillConfig } from "./project-config.js";
 import {
   skillProfileSchema,
-  type PendingFile,
   type SkillConfigEntry,
   type SkillOverride,
   type SkillProfile,
@@ -17,7 +16,10 @@ export function canonicalize(entries: SkillConfigEntry[]): SkillConfigEntry[] {
   const bySelector = new Map<string, SkillConfigEntry>();
   for (const entry of entries) {
     if (entry.path !== undefined) {
-      const path = normalize(entry.path);
+      const normalized = normalize(entry.path);
+      const path = basename(normalized) === "SKILL.md"
+        ? normalized
+        : join(normalized, "SKILL.md");
       if (!isAbsolute(path)) throw new Error(`skill path must be absolute: ${entry.path}`);
       bySelector.set(`path:${path}`, { ...entry, path });
     } else {
@@ -29,21 +31,19 @@ export function canonicalize(entries: SkillConfigEntry[]): SkillConfigEntry[] {
     .map(([, entry]) => entry);
 }
 
-function selectorKey(entry: SkillConfigEntry): string {
-  return entry.path === undefined ? `name:${entry.name}` : `path:${normalize(entry.path)}`;
-}
-
-export function hashConfig(entries: SkillConfigEntry[]): string {
-  return createHash("sha256").update(JSON.stringify(canonicalize(entries))).digest("hex");
-}
-
 export function resolveTarget(
   baseline: SkillConfigEntry[],
   overrides: SkillOverride[],
 ): SkillConfigEntry[] {
-  const result = new Map(canonicalize(baseline).map((entry) => [selectorKey(entry), entry]));
+  const result = new Map(canonicalize(baseline).map((entry) => [
+    entry.path === undefined ? `name:${entry.name}` : `path:${entry.path}`,
+    entry,
+  ]));
   for (const override of overrides) {
-    const path = normalize(override.path);
+    const normalized = normalize(override.path);
+    const path = basename(normalized) === "SKILL.md"
+      ? normalized
+      : join(normalized, "SKILL.md");
     if (!isAbsolute(path)) throw new Error(`skill path must be absolute: ${override.path}`);
     result.set(`path:${path}`, {
       ...(result.get(`path:${path}`) ?? { path }),
@@ -80,37 +80,9 @@ export class ProfileService {
 
   async deleteProfile(id: string): Promise<void> {
     await this.store.withLock(async () => {
-      const pending = await this.store.readPending();
-      if (pending?.profileId === id) throw new Error("armed profile cannot be deleted");
       const file = await this.store.readProfiles();
       file.profiles = file.profiles.filter((profile) => profile.id !== id);
       await this.store.writeProfiles(file);
-    });
-  }
-
-  async reconcile(): Promise<PendingFile | undefined> {
-    return this.store.withLock(async () => {
-      const pending = await this.store.readPending();
-      if (!pending || pending.state === "conflict") return pending;
-      const layer = extractUserSkillLayer(await this.client.readConfig(pending.cwd));
-      const currentHash = hashConfig(layer.value);
-      if (pending.state === "prepared" && currentHash === pending.baselineHash) {
-        await this.store.clearPending();
-        return undefined;
-      }
-      if (currentHash === pending.targetHash) {
-        if (pending.state === "prepared") {
-          pending.state = "armed";
-          pending.expectedVersion = layer.version;
-          await this.store.writePending(pending);
-          await this.store.appendAudit({ action: "reconciled", result: "armed", cwd: pending.cwd });
-        }
-        return pending;
-      }
-      pending.state = "conflict";
-      await this.store.writePending(pending);
-      await this.store.appendAudit({ action: "reconciled", result: "conflict", cwd: pending.cwd });
-      return pending;
     });
   }
 
@@ -119,10 +91,12 @@ export class ProfileService {
     await this.store.withLock(async () => {
       const inventory = await this.client.listSkills([cwd], true);
       const layer = extractUserSkillLayer(await this.client.readConfig(cwd));
-      const allowed = new Set([
-        ...inventory.data.flatMap((item) => item.skills.map((skill) => normalize(skill.path))),
-        ...layer.value.flatMap((item) => item.path === undefined ? [] : [normalize(item.path)]),
-      ]);
+      const allowed = new Set(canonicalize([
+        ...inventory.data.flatMap((item) => item.skills.map((skill) => ({
+          path: skill.path, enabled: skill.enabled,
+        }))),
+        ...layer.value,
+      ]).flatMap((entry) => entry.path === undefined ? [] : [entry.path]));
       const normalized = canonicalize([
         ...layer.value.filter((entry) => entry.path === undefined),
         ...value,
@@ -137,14 +111,17 @@ export class ProfileService {
   async applyPersistent(cwd: string, overrides: SkillOverride[]): Promise<SkillConfigEntry[]> {
     await this.requireBatchWrite();
     return this.store.withLock(async () => {
-      if (await this.store.readPending()) throw new Error("pending configuration must be restored");
       const inventory = await this.client.listSkills([cwd], true);
       const layer = extractUserSkillLayer(await this.client.readConfig(cwd));
-      const allowed = new Set([
-        ...inventory.data.flatMap((item) => item.skills.map((skill) => normalize(skill.path))),
-        ...layer.value.flatMap((entry) => entry.path === undefined ? [] : [normalize(entry.path)]),
-      ]);
-      if (overrides.some((override) => !allowed.has(normalize(override.path)))) {
+      const allowed = new Set(canonicalize([
+        ...inventory.data.flatMap((item) => item.skills.map((skill) => ({
+          path: skill.path, enabled: skill.enabled,
+        }))),
+        ...layer.value,
+      ]).flatMap((entry) => entry.path === undefined ? [] : [entry.path]));
+      if (overrides.some((override) => !allowed.has(canonicalize([
+        { path: override.path, enabled: true },
+      ])[0].path!))) {
         throw new Error("unknown skill path");
       }
       const target = resolveTarget(layer.value, overrides);
@@ -158,11 +135,15 @@ export class ProfileService {
     return this.store.withLock(async () => {
       const inventory = await this.client.listSkills([cwd], true);
       const layer = extractProjectSkillLayer(await this.client.readConfig(cwd), cwd);
-      const allowed = new Set([
-        ...inventory.data.flatMap((item) => item.skills.map((skill) => normalize(skill.path))),
-        ...layer.value.flatMap((entry) => entry.path === undefined ? [] : [normalize(entry.path)]),
-      ]);
-      if (overrides.some((override) => !allowed.has(normalize(override.path)))) {
+      const allowed = new Set(canonicalize([
+        ...inventory.data.flatMap((item) => item.skills.map((skill) => ({
+          path: skill.path, enabled: skill.enabled,
+        }))),
+        ...layer.value,
+      ]).flatMap((entry) => entry.path === undefined ? [] : [entry.path]));
+      if (overrides.some((override) => !allowed.has(canonicalize([
+        { path: override.path, enabled: true },
+      ])[0].path!))) {
         throw new Error("unknown skill path");
       }
       const value = canonicalize([
@@ -183,74 +164,6 @@ export class ProfileService {
       await this.client.writeFile(layer.filePath, updated);
       await this.store.appendAudit({ action: "project-config-saved", cwd });
       return value;
-    });
-  }
-
-  async arm(cwd: string, profileId: string | null, name: string, overrides: SkillOverride[]): Promise<PendingFile> {
-    await this.requireBatchWrite();
-    return this.store.withLock(async () => {
-      if (await this.store.readPending()) throw new Error("another profile is already pending");
-      const inventory = await this.client.listSkills([cwd], true);
-      const layer = extractUserSkillLayer(await this.client.readConfig(cwd));
-      const allowed = new Set([
-        ...inventory.data.flatMap((item) => item.skills.map((skill) => normalize(skill.path))),
-        ...layer.value.flatMap((entry) => entry.path === undefined ? [] : [normalize(entry.path)]),
-      ]);
-      if (overrides.some((override) => !allowed.has(normalize(override.path)))) {
-        throw new Error("unknown skill path");
-      }
-      const baseline = canonicalize(layer.value);
-      const target = resolveTarget(baseline, overrides);
-      const pending: PendingFile = {
-        schemaVersion: 1, state: "prepared", profileId, profileName: name, cwd,
-        baseline, target, baselineHash: hashConfig(baseline), targetHash: hashConfig(target),
-        expectedVersion: layer.version, armedAt: new Date().toISOString(),
-      };
-      await this.store.writePending(pending);
-      try {
-        await this.client.batchWriteSkillsConfig(target, layer.version);
-        const current = extractUserSkillLayer(await this.client.readConfig(cwd));
-        if (hashConfig(current.value) !== pending.targetHash) throw new Error("target verification failed");
-        pending.state = "armed";
-        pending.expectedVersion = current.version;
-        await this.store.writePending(pending);
-        await this.store.appendAudit({ action: "armed", profileId, cwd });
-        return pending;
-      } catch (error) {
-        const current = extractUserSkillLayer(await this.client.readConfig(cwd));
-        if (hashConfig(current.value) === pending.baselineHash) await this.store.clearPending();
-        throw error;
-      }
-    });
-  }
-
-  async restore(consumerSessionId?: string): Promise<{ restored: boolean; conflictPaths?: string[] }> {
-    return this.store.withLock(async () => {
-      const pending = await this.store.readPending();
-      if (!pending) return { restored: false };
-      await this.requireBatchWrite();
-      const layer = extractUserSkillLayer(await this.client.readConfig(pending.cwd));
-      const currentHash = hashConfig(layer.value);
-      if (pending.state === "prepared" && currentHash === pending.baselineHash) {
-        await this.store.clearPending();
-        return { restored: false };
-      }
-      if (currentHash !== pending.targetHash) {
-        pending.state = "conflict";
-        await this.store.writePending(pending);
-        const baseline = new Map(pending.baseline.map((x) => [selectorKey(x), x.enabled]));
-        const target = new Map(pending.target.map((x) => [selectorKey(x), x.enabled]));
-        const current = new Map(canonicalize(layer.value).map((x) => [selectorKey(x), x.enabled]));
-        const paths = new Set([...baseline.keys(), ...target.keys(), ...current.keys()]);
-        return { restored: false, conflictPaths: [...paths].filter((p) => current.get(p) !== target.get(p)) };
-      }
-      if (consumerSessionId) pending.consumerSessionId = consumerSessionId;
-      await this.client.batchWriteSkillsConfig(pending.baseline, layer.version);
-      const restored = extractUserSkillLayer(await this.client.readConfig(pending.cwd));
-      if (hashConfig(restored.value) !== pending.baselineHash) throw new Error("baseline verification failed");
-      await this.store.appendAudit({ action: "restored", consumerSessionId });
-      await this.store.clearPending();
-      return { restored: true };
     });
   }
 

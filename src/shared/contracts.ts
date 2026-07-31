@@ -47,27 +47,11 @@ export const profilesFileSchema = z.object({
   profiles: z.array(skillProfileSchema),
 });
 
-export const pendingFileSchema = z.object({
-  schemaVersion: z.literal(1),
-  state: z.enum(["prepared", "armed", "conflict"]),
-  profileId: z.string().nullable(),
-  profileName: z.string().min(1),
-  cwd: z.string(),
-  baseline: z.array(skillConfigEntrySchema),
-  target: z.array(skillConfigEntrySchema),
-  baselineHash: z.string(),
-  targetHash: z.string(),
-  expectedVersion: z.string(),
-  armedAt: z.string(),
-  consumerSessionId: z.string().optional(),
-});
-
 export type SkillOverride = z.infer<typeof skillOverrideSchema>;
 export type ResourceToggleEntry = z.infer<typeof resourceToggleEntrySchema>;
 export type ResourceOverride = z.infer<typeof resourceOverrideSchema>;
 export type SkillProfile = z.infer<typeof skillProfileSchema>;
 export type ProfilesFile = z.infer<typeof profilesFileSchema>;
-export type PendingFile = z.infer<typeof pendingFileSchema>;
 
 export interface SkillMetadata {
   name: string;

@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { AppServerClient } from "../src/server/app-server-client.js";
 import { JsonStore } from "../src/server/json-store.js";
-import { canonicalize, hashConfig, ProfileService, resolveTarget } from "../src/server/profile-service.js";
+import { canonicalize, ProfileService, resolveTarget } from "../src/server/profile-service.js";
 
 const roots: string[] = [];
 afterEach(async () => {
@@ -56,7 +56,6 @@ describe("profile resolution", () => {
       { path: "/skills/a/SKILL.md", enabled: true },
       { path: "/skills/b/SKILL.md", enabled: false },
     ]);
-    expect(hashConfig(canonicalize([{ path: "/skills/a/SKILL.md", enabled: false }]))).toHaveLength(64);
   });
 
   it("preserves name-based selectors while applying path overrides", () => {
@@ -72,14 +71,7 @@ describe("profile resolution", () => {
     ]);
   });
 
-  it("rejects an arm override outside the current inventory and user layer", async () => {
-    const { service: profiles } = await service();
-    await expect(profiles.arm("/repo", null, "Unsafe", [
-      { path: "/unknown/SKILL.md", state: "enabled" },
-    ])).rejects.toThrow("unknown skill path");
-  });
-
-  it("persists profile overrides without creating a pending transaction", async () => {
+  it("persists profile overrides", async () => {
     const setup = await service();
     await expect(setup.service.applyPersistent("/repo", [
       { path: "/skills/a/SKILL.md", state: "enabled" },
@@ -89,7 +81,6 @@ describe("profile resolution", () => {
     expect(setup.client.batchWriteSkillsConfig).toHaveBeenCalledWith([
       { path: "/skills/a/SKILL.md", enabled: true },
     ], "v1");
-    expect(await setup.store.readPending()).toBeUndefined();
   });
 
   it("writes project overrides through the filesystem API without replacing other config", async () => {
@@ -113,36 +104,4 @@ describe("profile resolution", () => {
     expect(setup.client.batchWriteSkillsConfig).not.toHaveBeenCalled();
   });
 
-  it("promotes a prepared transaction when the target was committed", async () => {
-    const client = fakeClient() as unknown as {
-      readConfig: ReturnType<typeof vi.fn>;
-    };
-    client.readConfig.mockResolvedValue({
-      config: {}, origins: {},
-      layers: [{ name: { type: "user", profile: null }, version: "v2", config: {
-        skills: { config: [{ path: "/skills/a/SKILL.md", enabled: true }] },
-      } }],
-    });
-    const setup = await service(client as unknown as AppServerClient);
-    const baseline = [{ path: "/skills/a/SKILL.md", enabled: false }];
-    const target = [{ path: "/skills/a/SKILL.md", enabled: true }];
-    await setup.store.writePending({
-      schemaVersion: 1, state: "prepared", profileId: null, profileName: "Daily", cwd: "/repo",
-      baseline, target, baselineHash: hashConfig(baseline), targetHash: hashConfig(target),
-      expectedVersion: "v1", armedAt: "2026-07-28T00:00:00.000Z",
-    });
-    await setup.service.reconcile();
-    expect(await setup.store.readPending()).toMatchObject({ state: "armed", expectedVersion: "v2" });
-  });
-
-  it("does not require user-config writes when there is nothing to restore", async () => {
-    const client = fakeClient() as unknown as {
-      canBatchWrite: ReturnType<typeof vi.fn>;
-    };
-    client.canBatchWrite.mockResolvedValue(false);
-    const setup = await service(client as unknown as AppServerClient);
-
-    await expect(setup.service.restore("s1")).resolves.toEqual({ restored: false });
-    expect(client.canBatchWrite).not.toHaveBeenCalled();
-  });
 });

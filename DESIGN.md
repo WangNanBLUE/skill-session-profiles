@@ -197,8 +197,7 @@ window surfaces may use external elevation.
 
 The desktop app uses the approved command-bar and two-pane workbench: task
 mode and saved profiles stay in the left pane, while the selected Skill
-configuration owns the right pane. The plugin panel collapses the same
-structure rather than maintaining a second interaction model. Stable 12–13px
+configuration owns the right pane. Stable 12–13px
 labels, explicit selection, and visible keyboard focus apply in both surfaces.
 
 ### Skill State Control

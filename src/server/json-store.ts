@@ -3,9 +3,7 @@ import { mkdir, open, readFile, rename, rm, stat } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 import {
-  pendingFileSchema,
   profilesFileSchema,
-  type PendingFile,
   type ProfilesFile,
 } from "../shared/contracts.js";
 
@@ -41,19 +39,6 @@ export class JsonStore {
 
   writeProfiles(value: ProfilesFile): Promise<void> {
     return this.atomicWrite("profiles.json", profilesFileSchema.parse(value));
-  }
-
-  async readPending(): Promise<PendingFile | undefined> {
-    const raw = await this.readOptional("pending.json");
-    return raw === undefined ? undefined : pendingFileSchema.parse(JSON.parse(raw));
-  }
-
-  writePending(value: PendingFile): Promise<void> {
-    return this.atomicWrite("pending.json", pendingFileSchema.parse(value));
-  }
-
-  clearPending(): Promise<void> {
-    return rm(join(this.root, "pending.json"), { force: true });
   }
 
   async appendAudit(event: Record<string, unknown>): Promise<void> {

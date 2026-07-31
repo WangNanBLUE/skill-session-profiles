@@ -6,9 +6,9 @@
 
 [简体中文](README.zh-CN.md)
 
-A macOS app and Codex plugin for managing global and project-specific skill
-defaults, reusable profiles, and the persistent configuration used by
-subsequently opened Codex tasks.
+A macOS app for managing global and project-specific Codex skill defaults,
+reusable profiles, and the persistent configuration used by subsequently
+opened Codex tasks.
 
 ## Download
 
@@ -42,25 +42,22 @@ The app is currently unsigned and not notarized.
 - Select local projects in the same order as the Codex project sidebar.
 - Edit global skill defaults through the Codex App Server contract.
 - Switch between Chinese and English, light and dark themes.
-- Share profile data between the standalone app and Codex plugin.
 
 ## How It Works
 
-The standalone Electron app and MCP panel use the same backend and data store.
-Configuration writes go through Codex App Server APIs; the project does not
-edit `~/.codex/config.toml` directly.
+The Electron app reads and writes configuration through Codex App Server APIs;
+it does not edit `~/.codex/config.toml` directly.
 
 Saving a profile only updates the reusable template. Selecting and applying it
 from Task Configuration writes its explicit overrides to the user-level
 configuration; editing the template later does not silently reapply it.
 
-Project configurations contain explicit overrides only. The app updates those
-tables through the Codex App Server filesystem API while preserving unrelated
-TOML and comments. Skills without a project override continue to inherit the
-global default. A session-start hook converts the saved project layer into an
-authoritative task policy, so project settings remain effective on Codex
-versions that parse project-scoped `skills.config` but do not apply it during
-skill discovery.
+Project configurations contain explicit overrides only. The app updates
+`.codex/config.toml` through the Codex App Server filesystem API while
+preserving unrelated TOML and comments. Codex's trusted-project layer parses
+those settings. Codex CLI 0.140.0 does not apply project-level overrides to
+plugin-provided skills during discovery, so user-level configuration remains
+the only reliable way to disable those skills across Codex tasks.
 
 User data is stored locally at:
 
@@ -74,7 +71,6 @@ notarized.
 ## Requirements
 
 - macOS on Apple Silicon
-- Node.js 22.22.2
 - Codex CLI installed and available in `PATH`
 
 ## Development
@@ -108,14 +104,6 @@ npm run dist:mac
 
 The `.app` bundle and DMG are written to `output/`. Release artifacts are not
 committed to the repository.
-
-## Plugin Development
-
-The plugin entry point is `.codex-plugin/plugin.json`. The bundled MCP server,
-hook, panel, and skill live in `.mcp.json`, `hooks/`, `src/`, and `skills/`.
-
-After changing plugin code, build the project before installing the plugin so
-that `dist/server/index.js` and the bundled panel are current.
 
 ## Security
 

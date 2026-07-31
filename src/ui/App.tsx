@@ -22,9 +22,8 @@ import {
 } from "lucide-react";
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 
-import type { PanelApi } from "./api.js";
+import type { AppApi } from "./api.js";
 import type {
-  PendingFile,
   CodexProject,
   McpServerMetadata,
   PluginMetadata,
@@ -57,7 +56,6 @@ type State = {
   projectMcpConfig?: { value: ResourceToggleEntry[]; filePath: string };
   projects: CodexProject[];
   profiles: SkillProfile[];
-  pending: PendingFile | null;
   writable: boolean;
 };
 type ControlResource = {
@@ -76,7 +74,7 @@ const COPY = {
     defaultBehavior: "默认行为", defaultDetail: "所有新任务首先继承这里的设置。配置方案只保存明确的单项覆盖。",
     totalSkills: "Skill 总数", enabledByDefault: "默认启用", disabledByDefault: "默认停用",
     persistentDetail: "应用后，后续打开的所有 Codex 任务都会沿用此配置。",
-    projectDetail: "仅对此项目生效；启动 Hook 会在重新打开、恢复或派生任务时应用，未设置项继承全局默认。",
+    projectDetail: "仅对此项目生效；保存到受信任项目的 Codex 原生配置层，未设置项继承全局默认。",
     profileDetail: "保存可复用的单项覆盖；未设置项始终继承全局默认。",
     import: "导入", export: "导出", profileName: "方案名称", profilePlaceholder: "例如：代码审查",
     defaultsDetail: "这里的启用状态是所有新任务和配置方案的继承基础。", enabledItems: "项启用",
@@ -104,7 +102,7 @@ const COPY = {
     defaultBehavior: "Default behavior", defaultDetail: "New tasks inherit these settings. Profiles store explicit overrides only.",
     totalSkills: "Total skills", enabledByDefault: "Enabled by default", disabledByDefault: "Disabled by default",
     persistentDetail: "After applying, all subsequently opened Codex tasks will use this configuration.",
-    projectDetail: "Applies only to this project. The startup hook enforces it for reopened, resumed, or derived tasks; unset skills inherit global defaults.",
+    projectDetail: "Applies only to this project through Codex's native trusted-project configuration; unset skills inherit global defaults.",
     profileDetail: "Save reusable overrides. Unset skills always inherit global defaults.",
     import: "Import", export: "Export", profileName: "Profile name", profilePlaceholder: "Example: Code review",
     defaultsDetail: "These states are inherited by new tasks and profiles.", enabledItems: "enabled",
@@ -130,7 +128,7 @@ type UiCopy = typeof COPY.zh;
 const LanguageContext = createContext<Language>("zh");
 const useCopy = (): UiCopy => COPY[useContext(LanguageContext)];
 
-export function App({ api, cwd }: { api: PanelApi; cwd: string }) {
+export function App({ api, cwd }: { api: AppApi; cwd: string }) {
   const [activeCwd, setActiveCwd] = useState(cwd);
   const [tab, setTab] = useState<Tab>("next");
   const [resourceKind, setResourceKind] = useState<ResourceKind>("skill");
@@ -464,15 +462,6 @@ export function App({ api, cwd }: { api: PanelApi; cwd: string }) {
         <AlertTriangle size={17} />
         <span><strong>{copy.readOnly}</strong>{copy.readOnlyDetail}</span>
       </div>}
-      {state?.pending && <PendingBanner
-        pending={state.pending}
-        busy={busy}
-        writable={state.writable}
-        onResolve={() => void run(
-          state.pending?.state === "conflict" ? "recover_global_defaults" : "cancel_pending_profile",
-          {},
-        )}
-      />}
     </div>
 
     <div className="workbench">
@@ -481,7 +470,6 @@ export function App({ api, cwd }: { api: PanelApi; cwd: string }) {
         <nav className="side-nav" aria-label={copy.functions}>
           <button aria-label={copy.taskConfig} aria-current={tab === "next" ? "page" : undefined} className={tab === "next" ? "active" : ""} onClick={() => setTab("next")}>
             <CircleCheck size={17} /><span>{copy.taskConfig}</span>
-            {state?.pending && <span className="nav-count">1</span>}
           </button>
           <button aria-label={copy.project} aria-current={tab === "project" ? "page" : undefined} className={tab === "project" ? "active" : ""} onClick={() => setTab("project")}>
             <FolderOpen size={17} /><span>{copy.project}</span>
@@ -812,7 +800,7 @@ export function App({ api, cwd }: { api: PanelApi; cwd: string }) {
         {tab === "next" && !profileDraft && <button
           type="button"
           className="primary-button"
-          disabled={busy || Boolean(state?.pending) || state?.writable === false}
+          disabled={busy || state?.writable === false}
           onClick={() => void run("apply_skill_configuration", {
             cwd: activeCwd,
             overrides: currentNextOverrides,
@@ -839,7 +827,7 @@ export function App({ api, cwd }: { api: PanelApi; cwd: string }) {
         {tab === "project" && <button
           type="button"
           className="primary-button"
-          disabled={busy || !projectDirty || Boolean(state?.pending) || state?.writable === false}
+          disabled={busy || !projectDirty || state?.writable === false}
           onClick={() => void run("save_project_skill_configuration", {
             cwd: activeCwd,
             overrides: currentProjectOverrides,
@@ -911,28 +899,6 @@ export function App({ api, cwd }: { api: PanelApi; cwd: string }) {
       </>}
     </footer>
   </main></LanguageContext.Provider>;
-}
-
-function PendingBanner({ pending, busy, writable, onResolve }: {
-  pending: PendingFile;
-  busy: boolean;
-  writable: boolean;
-  onResolve(): void;
-}) {
-  const english = useContext(LanguageContext) === "en";
-  const conflict = pending.state === "conflict";
-  return <div className={`state-banner pending-banner ${conflict ? "conflict" : ""}`} role="status">
-    {conflict ? <AlertTriangle size={17} /> : <CircleCheck size={17} />}
-    <span>
-      <strong>{conflict ? (english ? "Configuration conflict. " : "配置冲突。") : english ? `${pending.profileName} is a legacy one-time task configuration. ` : `${pending.profileName} 是旧版的一次性任务配置。`}</strong>
-      {conflict
-        ? (english ? "External changes were detected. Restore global defaults before continuing." : "检测到外部配置变化，请恢复全局默认后再继续。")
-        : (english ? "Cancel it before applying a persistent task configuration." : "请先取消该配置，再应用持续生效的任务配置。")}
-    </span>
-    <button type="button" className="secondary-button" disabled={busy || !writable} onClick={onResolve}>
-      {conflict ? (english ? "Retry Restore" : "重试恢复") : (english ? "Cancel Pending" : "取消等待")}
-    </button>
-  </div>;
 }
 
 function ProjectRail({ projects, activeCwd, onSelect }: {
@@ -1498,12 +1464,6 @@ function friendlyError(reason: unknown): string {
   const message = reason instanceof Error ? reason.message : String(reason);
   if (/operation already in progress/i.test(message)) {
     return "另一项配置操作仍在进行，请稍后重试。";
-  }
-  if (/another profile is already pending/i.test(message)) {
-    return "已有配置在等待下一任务，请先取消等待或完成该任务。";
-  }
-  if (/pending configuration must be restored/i.test(message)) {
-    return "仍有旧版一次性任务配置，请先取消或恢复，再应用此配置。";
   }
   if (/unknown skill path/i.test(message)) {
     return "Skill 列表已经变化。请刷新后重新保存。";

@@ -5,6 +5,7 @@ import {
   extractUserSkillLayer,
 } from "./config-layer.js";
 import { listCodexProjects } from "./codex-projects.js";
+import { resolveCodexHome } from "./data-root.js";
 import { type AppServerClient } from "./app-server-client.js";
 import { JsonStore } from "./json-store.js";
 import { ProfileService } from "./profile-service.js";
@@ -25,12 +26,18 @@ import {
   type SkillConfigEntry,
   type SkillMetadata,
 } from "../shared/contracts.js";
+import { readFile } from "node:fs/promises";
+import { dirname, join, normalize } from "node:path";
 import { z } from "zod";
 
 const CODEX_HIDDEN_PLUGIN_IDS = new Set([
   "browser@openai-bundled",
   "openai-library@openai-curated-remote",
 ]);
+
+const curatedSkillCacheSchema = z.object({
+  skills: z.array(z.object({ id: z.string().min(1) })),
+});
 
 const callSchema = z.discriminatedUnion("name", [
   z.object({
@@ -86,17 +93,6 @@ const callSchema = z.discriminatedUnion("name", [
       value: z.array(resourceToggleEntrySchema),
     }),
   }),
-  z.object({
-    name: z.literal("arm_next_session_profile"),
-    args: z.object({
-      cwd: z.string().refine((value) => value.startsWith("/")),
-      profileId: z.string().nullable(),
-      profileName: z.string(),
-      overrides: z.array(skillOverrideSchema),
-    }),
-  }),
-  z.object({ name: z.literal("cancel_pending_profile"), args: z.object({}) }),
-  z.object({ name: z.literal("recover_global_defaults"), args: z.object({}) }),
   z.object({ name: z.literal("export_skill_profiles"), args: z.object({}) }),
   z.object({
     name: z.literal("import_skill_profiles"),
@@ -123,25 +119,24 @@ export class SkillProfileBackend {
   }
 
   async state(cwd: string) {
-    await this.service.reconcile();
     const [
       inventory,
       config,
       globalConfig,
       profiles,
-      pending,
       writable,
       projects,
       pluginList,
+      curatedSkillPaths,
     ] = await Promise.all([
       this.client.listSkills([cwd]),
       this.client.readConfig(cwd),
       this.client.readConfig(),
       this.store.readProfiles(),
-      this.store.readPending(),
       this.client.canBatchWrite(),
       listCodexProjects(),
       this.client.listPlugins().catch((): null => null),
+      readCodexCuratedSkillPaths(),
     ]);
     const plugins = pluginInventory(pluginList, globalConfig, config);
     const mcpServers = mcpInventory(globalConfig, config);
@@ -153,16 +148,24 @@ export class SkillProfileBackend {
       mcpServers.filter((server) => server.scopes.includes("global")),
       extractUserResourceLayer(globalConfig, "mcp_servers").value,
     );
+    const skills = configurableSkillInventory(
+      inventory.data[0]?.skills ?? [],
+      curatedSkillPaths,
+    );
+    const inventoryPaths = new Map(skills.flatMap((skill) => [
+      [normalize(skill.path), skill.path] as const,
+      [normalize(dirname(skill.path)), skill.path] as const,
+    ]));
+    const toInventoryPaths = (value: SkillConfigEntry[]) => value
+      .filter((entry): entry is SkillConfigEntry & { path: string } => entry.path !== undefined)
+      .map((entry) => ({ ...entry, path: inventoryPaths.get(normalize(entry.path)) ?? entry.path }));
+    const projectLayer = extractProjectSkillLayer(config, cwd);
     return {
-      skills: standaloneSkillInventory(inventory.data[0]?.skills ?? []),
-      globalDefaults: extractUserSkillLayer(config).value.filter(
-        (entry): entry is SkillConfigEntry & { path: string } => entry.path !== undefined,
-      ),
+      skills,
+      globalDefaults: toInventoryPaths(extractUserSkillLayer(config).value),
       projectConfig: {
-        ...extractProjectSkillLayer(config, cwd),
-        value: extractProjectSkillLayer(config, cwd).value.filter(
-          (entry): entry is SkillConfigEntry & { path: string } => entry.path !== undefined,
-        ),
+        ...projectLayer,
+        value: toInventoryPaths(projectLayer.value),
       },
       plugins,
       mcpServers,
@@ -172,7 +175,6 @@ export class SkillProfileBackend {
       projectMcpConfig: extractProjectResourceLayer(config, cwd, "mcp_servers"),
       projects,
       profiles: profiles.profiles,
-      pending: pending ?? null,
       writable,
     };
   }
@@ -216,18 +218,6 @@ export class SkillProfileBackend {
           ),
         };
       }
-      case "arm_next_session_profile":
-        return {
-          pending: await this.service.arm(
-            input.args.cwd,
-            input.args.profileId,
-            input.args.profileName,
-            input.args.overrides,
-          ),
-        };
-      case "cancel_pending_profile":
-      case "recover_global_defaults":
-        return this.service.restore();
       case "export_skill_profiles":
         return this.store.readProfiles();
       case "import_skill_profiles": {
@@ -318,10 +308,13 @@ function pluginInventory(
     a.displayName.localeCompare(b.displayName, undefined, { sensitivity: "base" }));
 }
 
-function standaloneSkillInventory(skills: SkillMetadata[]): SkillMetadata[] {
+function configurableSkillInventory(
+  skills: SkillMetadata[],
+  curatedSkillPaths: Set<string>,
+): SkillMetadata[] {
   const result = new Map<string, SkillMetadata>();
   for (const skill of skills) {
-    if (!isStandaloneSkill(skill)) continue;
+    if (!isConfigurableSkill(skill, curatedSkillPaths)) continue;
     const current = result.get(skill.name);
     if (
       current === undefined
@@ -338,40 +331,26 @@ function standaloneSkillInventory(skills: SkillMetadata[]): SkillMetadata[] {
     a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
 }
 
-function isStandaloneSkill(skill: SkillMetadata): boolean {
-  if (skill.scope === "system" || skill.scope === "admin") return false;
-  const segments = skill.path.replaceAll("\\", "/").split("/").filter(Boolean);
-  const normalized = segments.map((segment) => segment.toLowerCase());
-
-  for (let index = 0; index < normalized.length - 1; index += 1) {
-    if (normalized[index] === ".agents" && normalized[index + 1] === "skills") {
-      return false;
-    }
-    if (
-      normalized[index] === ".codex"
-      && normalized[index + 1] === "skills"
-      && normalized[index + 2] === ".system"
-    ) {
-      return false;
-    }
-  }
-
-  return !isPluginSkillPath(normalized);
+function isConfigurableSkill(
+  skill: SkillMetadata,
+  curatedSkillPaths: Set<string>,
+): boolean {
+  if (skill.scope === "system") return false;
+  return !curatedSkillPaths.has(normalize(skill.path));
 }
 
-function isPluginSkillPath(segments: string[]): boolean {
-  for (let index = 0; index < segments.length; index += 1) {
-    if (segments[index] !== "plugins") continue;
-    const cached = segments[index + 1] === "cache";
-    const pluginIndex = index + (cached ? 3 : 1);
-    const pluginRootEnd = pluginIndex + (cached ? 1 : 0);
-    if (segments[pluginIndex] === undefined) continue;
-    if (segments.findIndex((segment, position) =>
-      position > pluginRootEnd && segment === "skills") >= 0) {
-      return true;
-    }
+async function readCodexCuratedSkillPaths(): Promise<Set<string>> {
+  try {
+    const codexHome = resolveCodexHome();
+    const cache = curatedSkillCacheSchema.parse(JSON.parse(await readFile(
+      join(codexHome, "vendor_imports", "skills-curated-cache.json"),
+      "utf8",
+    )));
+    return new Set(cache.skills.map(({ id }) =>
+      normalize(join(codexHome, "skills", id, "SKILL.md"))));
+  } catch {
+    return new Set();
   }
-  return false;
 }
 
 function skillScopePriority(scope: SkillMetadata["scope"]): number {

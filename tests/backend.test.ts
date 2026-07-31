@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, it, vi } from "vitest";
@@ -10,6 +10,7 @@ import type { AppServerClient } from "../src/server/app-server-client.js";
 const roots: string[] = [];
 
 afterEach(async () => {
+  vi.unstubAllEnvs();
   await Promise.all(roots.splice(0).map((root) =>
     rm(root, { recursive: true, force: true })));
 });
@@ -223,7 +224,7 @@ it("uses configured plugins only when Codex plugin inventory is unavailable", as
   expect(state.plugins[0]?.enabled).toBe(false);
 });
 
-it("matches Codex standalone skill inventory", async () => {
+it("includes plugin skills while hiding Codex-provided skills", async () => {
   const skill = (
     name: string,
     path: string,
@@ -238,6 +239,18 @@ it("matches Codex standalone skill inventory", async () => {
       config: { skills: { config: [] } },
     }],
   };
+  const root = await mkdtemp(join(tmpdir(), "backend-skill-inventory-"));
+  roots.push(root);
+  vi.stubEnv("CODEX_HOME", root);
+  await mkdir(join(root, "vendor_imports"), { recursive: true });
+  await writeFile(join(root, "vendor_imports", "skills-curated-cache.json"), JSON.stringify({
+    skills: [
+      { id: "hatch-pet" },
+      { id: "pdf" },
+      { id: "playwright" },
+      { id: "playwright-interactive" },
+    ],
+  }));
   const client = {
     listSkills: vi.fn().mockResolvedValue({
       data: [{
@@ -247,6 +260,14 @@ it("matches Codex standalone skill inventory", async () => {
           skill("Taste", "/Users/test/.codex/skills/taste/SKILL.md"),
           skill("Project", "/repo/.codex/skills/project/SKILL.md", "repo"),
           skill("Project", "/Users/test/.codex/skills/project/SKILL.md"),
+          skill("hatch-pet", join(root, "skills/hatch-pet/SKILL.md")),
+          skill("pdf", join(root, "skills/pdf/SKILL.md")),
+          skill("playwright", join(root, "skills/playwright/SKILL.md")),
+          skill(
+            "playwright-interactive",
+            join(root, "skills/playwright-interactive/SKILL.md"),
+          ),
+          skill("pdf", "/repo/.codex/skills/pdf/SKILL.md", "repo"),
           skill("System", "/Users/test/.codex/skills/.system/system/SKILL.md", "system"),
           skill(
             "Plugin",
@@ -261,12 +282,13 @@ it("matches Codex standalone skill inventory", async () => {
     canBatchWrite: vi.fn().mockResolvedValue(true),
     listPlugins: vi.fn().mockResolvedValue({ marketplaces: [] }),
   } as unknown as AppServerClient;
-  const root = await mkdtemp(join(tmpdir(), "backend-skill-inventory-"));
-  roots.push(root);
-
   const state = await new SkillProfileBackend(client, new JsonStore(root)).state("/repo");
 
   expect(state.skills.map((entry) => [entry.name, entry.path])).toEqual([
+    ["Admin", "/opt/codex/skills/admin/SKILL.md"],
+    ["Imported", "/Users/test/.agents/skills/imported/SKILL.md"],
+    ["pdf", "/repo/.codex/skills/pdf/SKILL.md"],
+    ["Plugin", "/Users/test/.codex/plugins/cache/market/plugin/1/skills/tool/SKILL.md"],
     ["Project", "/repo/.codex/skills/project/SKILL.md"],
     ["Taste", "/Users/test/.codex/skills/taste/SKILL.md"],
   ]);

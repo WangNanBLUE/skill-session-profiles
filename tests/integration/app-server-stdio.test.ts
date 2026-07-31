@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -35,6 +35,13 @@ it("reads Codex state without an app-server control socket", async () => {
 it("saves project skill configuration through the real app-server filesystem API", async () => {
   const projectRoot = await mkdtemp(join(tmpdir(), "skill-profiles-project-"));
   const dataRoot = await mkdtemp(join(tmpdir(), "skill-profiles-data-"));
+  const codexHome = await mkdtemp(join(tmpdir(), "skill-profiles-codex-home-"));
+  const previousCodexHome = process.env.CODEX_HOME;
+  process.env.CODEX_HOME = codexHome;
+  await writeFile(
+    join(codexHome, "config.toml"),
+    `[projects.${JSON.stringify(await realpath(projectRoot))}]\ntrust_level = "trusted"\n`,
+  );
   const projectConfig = join(projectRoot, ".codex", "config.toml");
   await mkdir(join(projectRoot, ".codex"));
   await writeFile(projectConfig, '# Preserve this comment\nmodel = "gpt-5"\n');
@@ -51,11 +58,57 @@ it("saves project skill configuration through the real app-server filesystem API
     await expect(readFile(projectConfig, "utf8")).resolves.toContain(
       `# Preserve this comment\nmodel = "gpt-5"\n\n[[skills.config]]\npath = ${JSON.stringify(skillPath)}`,
     );
+    const updatedConfig = await client.readConfig(projectRoot);
+    expect(updatedConfig.layers?.find(
+      (layer) => layer.name.type === "project",
+    )?.config).toMatchObject({
+      skills: { config: [{ path: skillPath, enabled: false }] },
+    });
   } finally {
     await client.close();
+    if (previousCodexHome === undefined) {
+      delete process.env.CODEX_HOME;
+    } else {
+      process.env.CODEX_HOME = previousCodexHome;
+    }
     await Promise.all([
       rm(projectRoot, { recursive: true, force: true }),
       rm(dataRoot, { recursive: true, force: true }),
+      rm(codexHome, { recursive: true, force: true }),
     ]);
+  }
+});
+
+it("disables a skill when user config uses its full SKILL.md path", async () => {
+  const codexHome = await mkdtemp(join(tmpdir(), "skill-profiles-codex-home-"));
+  const previousCodexHome = process.env.CODEX_HOME;
+  process.env.CODEX_HOME = codexHome;
+  let client = new AppServerClient();
+
+  try {
+    const inventory = await client.listSkills([process.cwd()], true);
+    const skillPath = inventory.data[0]?.skills.find(
+      (skill) => skill.scope === "user",
+    )?.path;
+    expect(skillPath).toBeDefined();
+    await client.close();
+
+    await writeFile(
+      join(codexHome, "config.toml"),
+      `[[skills.config]]\npath = ${JSON.stringify(skillPath)}\nenabled = false\n`,
+    );
+    client = new AppServerClient();
+    const updatedInventory = await client.listSkills([process.cwd()], true);
+    expect(updatedInventory.data[0]?.skills.find(
+      (skill) => skill.path === skillPath,
+    )?.enabled).toBe(false);
+  } finally {
+    await client.close();
+    if (previousCodexHome === undefined) {
+      delete process.env.CODEX_HOME;
+    } else {
+      process.env.CODEX_HOME = previousCodexHome;
+    }
+    await rm(codexHome, { recursive: true, force: true });
   }
 });

@@ -1,16 +1,13 @@
 import { defineConfig } from "tsup";
 
 const bundledDependencies = [
-  "@modelcontextprotocol/sdk",
-  "@modelcontextprotocol/ext-apps",
+  "toml-eslint-parser",
   "zod",
 ];
 
 export default defineConfig([
   {
     entry: {
-      "server/index": "src/server/index.ts",
-      "hook/session-start": "src/hook/session-start.ts",
       "electron/main": "src/electron/main.ts",
     },
     format: ["esm"],

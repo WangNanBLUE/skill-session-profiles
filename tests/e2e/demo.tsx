@@ -78,7 +78,6 @@ let state = {
     { id: "radio", name: "Mineradio", rootPaths: ["/Users/demo/projects/Mineradio"] },
   ],
   profiles,
-  pending: null,
   writable: true,
 };
 const api = {

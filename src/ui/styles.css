@@ -16,8 +16,6 @@
   --command: #1f5f9d;
   --command-hover: #194f84;
   --focus: #2563a6;
-  --pending-surface: #f1f6fd;
-  --pending-border: #86a7d7;
   --danger: #9b2828;
   --danger-surface: #fff5f5;
   --danger-border: #e3a4a4;
@@ -356,24 +354,13 @@ dd {
   color: var(--ink);
 }
 
-.pending-banner {
-  border-color: var(--pending-border);
-  background: var(--pending-surface);
-}
-
-.pending-banner > svg {
-  color: var(--command);
-}
-
-.error-banner,
-.pending-banner.conflict {
+.error-banner {
   border-color: var(--danger-border);
   color: var(--danger);
   background: var(--danger-surface);
 }
 
-.error-banner strong,
-.pending-banner.conflict strong {
+.error-banner strong {
   color: var(--danger);
 }
 
@@ -1255,8 +1242,6 @@ dd {
     --command: #4c8dff;
     --command-hover: #3d7de9;
     --focus: #6aa3ff;
-    --pending-surface: #0f1e33;
-    --pending-border: #31557e;
     --danger: #ff6b6b;
     --danger-surface: #2a1517;
     --danger-border: #713237;

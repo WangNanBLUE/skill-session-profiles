@@ -7,6 +7,16 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- Write project skill overrides to Codex's native trusted-project configuration
+  layer, while documenting the Codex CLI 0.140.0 limitation for plugin skills.
+
+### Removed
+
+- Remove the Codex plugin, MCP panel, packaged skill, and lifecycle hook.
+- Remove the legacy one-time pending configuration transaction.
+
 ## [0.2.1] - 2026-07-30
 
 ### Added

@@ -1,14 +1,10 @@
 # Skill Session Profiles for macOS
 
-The standalone app and Codex plugin share profiles, persistent configuration,
-and legacy pending-session state at:
+The standalone app stores profiles and audit data at:
 
 ```text
 ~/.codex/skill-session-profiles
 ```
-
-Existing plugin data is copied into this stable location on first launch. Files
-already present in the stable location are never overwritten by migration.
 
 ## Requirements
 

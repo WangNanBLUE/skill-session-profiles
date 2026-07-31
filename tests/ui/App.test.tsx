@@ -73,7 +73,6 @@ const state = {
     ],
     createdAt: "2026-07-28T00:00:00.000Z", updatedAt: "2026-07-28T00:00:00.000Z",
   }],
-  pending: null,
   writable: true,
 };
 
@@ -117,7 +116,7 @@ function createApi() {
   };
 }
 
-describe("Skill Session Profiles panel", () => {
+describe("Skill Session Profiles app", () => {
   it("switches language and theme and remembers both preferences", async () => {
     const api = createApi();
     render(<App api={api} cwd="/repo" />);

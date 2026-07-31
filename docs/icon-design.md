@@ -9,14 +9,13 @@ large enabled switch, expressing the product's core behavior: selecting a set
 of skills and applying that configuration to Codex tasks.
 
 The switch is the primary silhouette. The skill graph remains secondary so the
-icon stays recognizable at small macOS and plugin sizes. The content bounds
+icon stays recognizable at small macOS sizes. The content bounds
 leave equal vertical space inside the white rounded-square surface.
 
 ## Assets
 
 - `assets/logo.svg`: editable source
 - `assets/logo.png`: 1024 x 1024 application and README asset
-- `assets/icon.png`: 256 x 256 compact plugin asset
 
 Generated PNGs retain transparent corners outside the white rounded-square
 surface.

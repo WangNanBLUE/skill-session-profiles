@@ -9,5 +9,4 @@ interface SkillSessionProfilesDesktopApi {
 
 interface Window {
   skillSessionProfiles?: SkillSessionProfilesDesktopApi;
-  __CODEX_CWD__?: string;
 }

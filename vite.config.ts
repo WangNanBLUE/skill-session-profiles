@@ -1,15 +1,15 @@
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
-import { viteSingleFile } from "vite-plugin-singlefile";
 
 export default defineConfig({
   root: "src/ui",
-  plugins: [react(), viteSingleFile()],
+  base: "./",
+  plugins: [react()],
   build: {
-    outDir: "../../dist/ui",
-    emptyOutDir: false,
+    outDir: "../../dist/desktop",
+    emptyOutDir: true,
     rollupOptions: {
-      input: "src/ui/panel.html",
+      input: "src/ui/desktop.html",
     },
   },
 });
