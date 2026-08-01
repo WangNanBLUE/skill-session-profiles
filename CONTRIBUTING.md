@@ -34,5 +34,5 @@ requirement.
 - Keep generated `dist/`, `output/`, screenshots, and local data out of commits.
 - Confirm which checks were run and disclose anything skipped.
 
-By contributing, you agree that your contribution is licensed under the MIT
-License.
+By contributing, you agree that your contribution is licensed under the
+GNU General Public License v3.0 only.

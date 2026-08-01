@@ -115,4 +115,4 @@ macOS 的 `.app`、DMG 或 Windows 的 NSIS 安装程序会输出到 `output/`�
 
 ## 许可证
 
-项目使用 [MIT License](LICENSE)。
+项目使用 [GNU General Public License v3.0 only](LICENSE)。

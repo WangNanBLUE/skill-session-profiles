@@ -3,7 +3,7 @@
   "version": "0.3.3",
   "description": "Manage Codex skill defaults, reusable profiles, and persistent task configuration.",
   "author": "Blue",
-  "license": "MIT",
+  "license": "GPL-3.0-only",
   "private": true,
   "engines": {
     "node": ">=22.22.2 <23"
