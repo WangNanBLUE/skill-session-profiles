@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.3] - 2026-08-01
+
+### Fixed
+
+- Discover Windows Codex CLI installations from npm and the Codex desktop
+  cache when the Electron process receives an incomplete `PATH`.
+- Accept Windows drive-letter and UNC working directories in backend requests.
+- Preserve npm `.cmd` shim paths containing spaces when starting app-server.
+
 ## [0.3.2] - 2026-07-31
 
 ### Fixed
