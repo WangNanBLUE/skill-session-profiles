@@ -27,7 +27,7 @@ import {
   type SkillMetadata,
 } from "../shared/contracts.js";
 import { readFile } from "node:fs/promises";
-import { dirname, join, normalize } from "node:path";
+import { dirname, isAbsolute, join, normalize, win32 } from "node:path";
 import { z } from "zod";
 
 const CODEX_HIDDEN_PLUGIN_IDS = new Set([
@@ -39,15 +39,19 @@ const curatedSkillCacheSchema = z.object({
   skills: z.array(z.object({ id: z.string().min(1) })),
 });
 
+const absolutePathSchema = z.string().refine(
+  (value) => isAbsolute(value) || win32.isAbsolute(value),
+);
+
 const callSchema = z.discriminatedUnion("name", [
   z.object({
     name: z.literal("get_skill_profile_state"),
-    args: z.object({ cwd: z.string().refine((value) => value.startsWith("/")) }),
+    args: z.object({ cwd: absolutePathSchema }),
   }),
   z.object({
     name: z.literal("save_global_skill_defaults"),
     args: z.object({
-      cwd: z.string().refine((value) => value.startsWith("/")),
+      cwd: absolutePathSchema,
       value: z.array(skillConfigEntrySchema),
     }),
   }),
@@ -66,7 +70,7 @@ const callSchema = z.discriminatedUnion("name", [
   z.object({
     name: z.literal("apply_skill_configuration"),
     args: z.object({
-      cwd: z.string().refine((value) => value.startsWith("/")),
+      cwd: absolutePathSchema,
       profileId: z.string().nullable(),
       overrides: z.array(skillOverrideSchema),
     }),
@@ -74,14 +78,14 @@ const callSchema = z.discriminatedUnion("name", [
   z.object({
     name: z.literal("save_project_skill_configuration"),
     args: z.object({
-      cwd: z.string().refine((value) => value.startsWith("/")),
+      cwd: absolutePathSchema,
       overrides: z.array(skillOverrideSchema),
     }),
   }),
   z.object({
     name: z.literal("save_global_resource_configuration"),
     args: z.object({
-      cwd: z.string().refine((value) => value.startsWith("/")),
+      cwd: absolutePathSchema,
       resource: z.enum(["plugin", "mcp"]),
       value: z.array(resourceToggleEntrySchema),
     }),
@@ -89,7 +93,7 @@ const callSchema = z.discriminatedUnion("name", [
   z.object({
     name: z.literal("save_project_resource_configuration"),
     args: z.object({
-      cwd: z.string().refine((value) => value.startsWith("/")),
+      cwd: absolutePathSchema,
       resource: z.enum(["plugin", "mcp"]),
       value: z.array(resourceToggleEntrySchema),
     }),

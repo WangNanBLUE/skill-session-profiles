@@ -54,11 +54,12 @@ export function codexAppServerInvocation(
   codexCommand: string,
   platform: NodeJS.Platform = process.platform,
   comSpec = process.env.ComSpec || "cmd.exe",
-): { command: string; args: string[] } {
+): { command: string; args: string[]; windowsVerbatimArguments?: boolean } {
   if (platform === "win32" && /\.(?:cmd|bat)$/i.test(codexCommand)) {
     return {
       command: comSpec,
-      args: ["/d", "/s", "/c", `"${codexCommand}" app-server --stdio`],
+      args: ["/d", "/s", "/c", `""${codexCommand}" app-server --stdio"`],
+      windowsVerbatimArguments: true,
     };
   }
   return { command: codexCommand, args: ["app-server", "--stdio"] };
@@ -80,6 +81,7 @@ export class CodexAppServerLineTransport implements LineTransport {
       env: codexChildEnvironment(codexCommand),
       shell: false,
       stdio: ["pipe", "pipe", "pipe"],
+      windowsVerbatimArguments: invocation.windowsVerbatimArguments,
     });
 
     this.child.stdout.setEncoding("utf8");
