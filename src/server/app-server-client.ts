@@ -58,7 +58,7 @@ export function codexAppServerInvocation(
   if (platform === "win32" && /\.(?:cmd|bat)$/i.test(codexCommand)) {
     return {
       command: comSpec,
-      args: ["/d", "/s", "/c", `"${codexCommand}" app-server --stdio`],
+      args: ["/d", "/s", "/c", `""${codexCommand}" app-server --stdio"`],
       windowsVerbatimArguments: true,
     };
   }

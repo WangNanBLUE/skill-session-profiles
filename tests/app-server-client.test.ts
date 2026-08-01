@@ -1,3 +1,9 @@
+import { execFile } from "node:child_process";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { promisify } from "node:util";
+
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -6,15 +12,47 @@ import {
   type LineTransport,
 } from "../src/server/app-server-client.js";
 
+const execFileAsync = promisify(execFile);
+
 describe("codexAppServerInvocation", () => {
-  it("runs Windows npm command shims through cmd.exe", () => {
-    expect(codexAppServerInvocation("C:\\npm\\codex.cmd", "win32", "cmd.exe"))
+  it("preserves a spaced Windows npm shim path through cmd.exe", () => {
+    expect(codexAppServerInvocation(
+      "C:\\Users\\Jane Doe\\npm\\codex.cmd",
+      "win32",
+      "cmd.exe",
+    ))
       .toEqual({
         command: "cmd.exe",
-        args: ["/d", "/s", "/c", '"C:\\npm\\codex.cmd" app-server --stdio'],
+        args: [
+          "/d",
+          "/s",
+          "/c",
+          '""C:\\Users\\Jane Doe\\npm\\codex.cmd" app-server --stdio"',
+        ],
         windowsVerbatimArguments: true,
       });
   });
+
+  it.runIf(process.platform === "win32")(
+    "executes a command shim whose path contains spaces",
+    async () => {
+      const root = await mkdtemp(join(tmpdir(), "codex shim with spaces-"));
+      const command = join(root, "codex.cmd");
+      await writeFile(command, "@echo off\r\necho %*\r\n");
+      const invocation = codexAppServerInvocation(command);
+
+      try {
+        const { stdout } = await execFileAsync(
+          invocation.command,
+          invocation.args,
+          { windowsVerbatimArguments: invocation.windowsVerbatimArguments },
+        );
+        expect(stdout.trim()).toBe("app-server --stdio");
+      } finally {
+        await rm(root, { recursive: true, force: true });
+      }
+    },
+  );
 
   it("launches native executables directly", () => {
     expect(codexAppServerInvocation("C:\\bin\\codex.exe", "win32"))
